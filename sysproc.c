@@ -6,6 +6,7 @@
 #include "memlayout.h"
 #include "mmu.h"
 #include "proc.h"
+#include "procinfo.h"
 
 int
 sys_fork(void)
@@ -88,4 +89,24 @@ sys_uptime(void)
   xticks = ticks;
   release(&tickslock);
   return xticks;
+}
+
+int
+sys_getprocsinfo(void){
+  struct procinfo *procinfos;
+
+  if(argptr(0, (void*)&procinfos, sizeof(*procinfos)) < 0)
+    return -1;
+
+  struct proc procs[NPROC];
+  int nprocs = proclist(procs);
+  for (int i = 0; i < nprocs; ++i) {
+    procinfos[i].pid = procs[i].pid;
+    safestrcpy(procinfos[i].pname, procs[i].name, strlen(procs[i].name) + 1);
+//    struct procinfo pinfo;
+//    pinfo.pid = procs[i].pid;
+//    safestrcpy(pinfo.pname, procs[i].name, strlen(procs[i].name) + 1);
+//    procinfos[i] = pinfo;
+  }
+  return nprocs;
 }

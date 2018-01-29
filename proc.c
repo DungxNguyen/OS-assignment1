@@ -20,6 +20,20 @@ extern void trapret(void);
 
 static void wakeup1(void *chan);
 
+int
+proclist(struct proc *proc){
+  struct proc *p;
+  int index = 0;
+
+  acquire(&ptable.lock);
+  for(p = ptable.proc; p < &ptable.proc[NPROC]; p++)
+    if(p->state != UNUSED)
+        proc[index++] = *p;
+  release(&ptable.lock);
+
+  return index;
+}
+
 void
 pinit(void)
 {
