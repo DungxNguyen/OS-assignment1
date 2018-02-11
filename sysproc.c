@@ -89,3 +89,25 @@ sys_uptime(void)
   release(&tickslock);
   return xticks;
 }
+
+int
+sys_shmem_access(void){
+
+  int page_number;
+  if (argint(0, &page_number) < 0)
+    return -1;
+
+  cprintf( "Access %d\n", page_number);
+  return 0;
+}
+
+int
+sys_shmem_count(void){
+
+  int page_number;
+  if (argint(0, &page_number) < 0)
+    return -1;
+
+  cprintf( "Count %d\n", page_number);
+  return 0;
+}
