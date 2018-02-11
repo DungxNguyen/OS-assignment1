@@ -194,6 +194,10 @@ fork(void)
     kfree(np->kstack);
     np->kstack = 0;
     np->state = UNUSED;
+    np->shared_memory_count = curproc->shared_memory_count;
+    for (i = 0; i < MAX_SHARED_PAGES; i++){
+      np->shared_memory[i] = curproc->shared_memory[i];
+    }
     return -1;
   }
   np->sz = curproc->sz;
@@ -289,7 +293,7 @@ wait(void)
         pid = p->pid;
         kfree(p->kstack);
         p->kstack = 0;
-        freevm(p->pgdir);
+        freevm(p->pgdir, p->shared_memory_count);
         p->pid = 0;
         p->parent = 0;
         p->name[0] = 0;
