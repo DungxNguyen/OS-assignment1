@@ -140,7 +140,7 @@ setupkvm(void) {
   for(k = kmap; k < &kmap[NELEM(kmap)]; k++)
     if(mappages(pgdir, k->virt, k->phys_end - k->phys_start,
                 (uint)k->phys_start, k->perm) < 0) {
-      freevm(pgdir, 0);
+      freevm(pgdir);
       return 0;
     }
   return pgdir;
@@ -291,29 +291,8 @@ deallocuvm(pde_t *pgdir, uint oldsz, uint newsz)
 
 // Free a page table and all the physical memory pages
 // in the user part.
-//void
-//freevm(pde_t *pgdir)
-//{
-//  uint i;
-//
-//  if(pgdir == 0)
-//    panic("freevm: no pgdir");
-//
-////  cprintf("FREEVM: %d %s %d\n", proc_shared_memory_offset(), myproc()->name, myproc()->pid);
-//  deallocuvm(pgdir, KERNBASE, 0);
-//  for(i = 0; i < NPDENTRIES; i++){
-//    if(pgdir[i] & PTE_P){
-//      char * v = P2V(PTE_ADDR(pgdir[i]));
-//      kfree(v);
-//    }
-//  }
-//  kfree((char*)pgdir);
-//}
-
-// Free a page table and all the physical memory pages
-// in the user part.
 void
-freevm(pde_t *pgdir, int shared_count)
+freevm(pde_t *pgdir)
 {
   uint i;
 
@@ -321,7 +300,7 @@ freevm(pde_t *pgdir, int shared_count)
     panic("freevm: no pgdir");
 
 //  cprintf("FREEVM: %d %s %d\n", proc_shared_memory_offset(), myproc()->name, myproc()->pid);
-  deallocuvm(pgdir, KERNBASE - shared_count * PGSIZE, 0);
+  deallocuvm(pgdir, KERNBASE, 0);
   for(i = 0; i < NPDENTRIES; i++){
     if(pgdir[i] & PTE_P){
       char * v = P2V(PTE_ADDR(pgdir[i]));
@@ -330,6 +309,54 @@ freevm(pde_t *pgdir, int shared_count)
   }
   kfree((char*)pgdir);
 }
+
+void
+freevm_process(struct proc* proc){
+  uint i;
+
+  pde_t* pgdir = proc -> pgdir;
+
+  if(pgdir == 0)
+    panic("freevm: no pgdir");
+
+//  cprintf("FREEVM: %d %s %d\n", proc_shared_memory_offset(), myproc()->name, myproc()->pid);
+  deallocuvm(pgdir, KERNBASE  - (proc -> shared_memory_count) * PGSIZE, 0);
+  for(i = 0; i < NPDENTRIES; i++){
+    if(pgdir[i] & PTE_P){
+      char * v = P2V(PTE_ADDR(pgdir[i]));
+      kfree(v);
+    }
+  }
+  kfree((char*)pgdir);
+
+  for (int i = 0; i < MAX_SHARED_PAGES; i++) {
+    if (proc -> shared_memory != 0 ){
+      shared_count[i] --;
+      proc->shared_memory[i] = 0;
+    }
+  }
+}
+
+// Free a page table and all the physical memory pages
+// in the user part.
+//void
+//freevm(pde_t *pgdir, int shared_count)
+//{
+//  uint i;
+//
+//  if(pgdir == 0)
+//    panic("freevm: no pgdir");
+//
+////  cprintf("FREEVM: %d %s %d\n", proc_shared_memory_offset(), myproc()->name, myproc()->pid);
+//  deallocuvm(pgdir, KERNBASE - shared_count * PGSIZE, 0);
+//  for(i = 0; i < NPDENTRIES; i++){
+//    if(pgdir[i] & PTE_P){
+//      char * v = P2V(PTE_ADDR(pgdir[i]));
+//      kfree(v);
+//    }
+//  }
+//  kfree((char*)pgdir);
+//}
 
 // Clear PTE_U on a page. Used to create an inaccessible
 // page beneath the user stack.
@@ -369,10 +396,25 @@ copyuvm(pde_t *pgdir, uint sz)
     if(mappages(d, (void*)i, PGSIZE, V2P(mem), flags) < 0)
       goto bad;
   }
+
+  // Critical part here
+  for(i = KERNBASE - PGSIZE; i > sz && i >= KERNBASE - 4 * PGSIZE; i -= PGSIZE)
+    if((pte = walkpgdir(pgdir, (void *) i, 0)) != 0)
+      if((*pte & PTE_P))
+        if(mappages(d, (void*)i, PGSIZE, PTE_ADDR(*pte), PTE_FLAGS(*pte)) < 0)
+          goto bad;
+
+//      mappages(d, (void *) i, PGSIZE, (uint) uva2ka(pgdir, (char *)i), PTE_W | PTE_U);
+//          //success
+//          cprintf("%x:%x\n", i, PTE_ADDR(*pte));
+//          cprintf("%x:%x\n", i, (uint)uva2ka(d, (char*)i));
+//        }
+//      }
+//  }
   return d;
 
 bad:
-  freevm(d, 0);
+  freevm(d);
   return 0;
 }
 
@@ -452,6 +494,8 @@ uint
 shmem_access(int page_number){
 
   if (myproc()->shared_memory[page_number] != 0){
+//    cprintf("%d %d %d %d\n", myproc()-> shared_memory[0], myproc()-> shared_memory[1], myproc()-> shared_memory[2], myproc()-> shared_memory[3] );
+//    cprintf("%d:%x:%x:%d\n", myproc()->pid, myproc() -> shared_memory[page_number], uva2ka(myproc()->pgdir, (char *) myproc()->shared_memory[page_number] ));
     return myproc()->shared_memory[page_number];
   }
 
@@ -462,7 +506,7 @@ shmem_access(int page_number){
   if (virtual_address <= myproc()-> sz)
     return 0;
 
-  if (mappages(myproc()->pgdir, (void *) virtual_address, PGSIZE, shared_memory[page_number], PTE_W | PTE_U ) < 0){
+  if (mappages(myproc()->pgdir, (void *) virtual_address, PGSIZE, V2P(shared_memory[page_number]), PTE_W | PTE_U ) < 0){
     cprintf("shared memory cannot map to physical address");
     shared_count[page_number]--;
     return 0;
@@ -471,6 +515,9 @@ shmem_access(int page_number){
   myproc()->shared_memory[page_number] = virtual_address;
   myproc()->shared_memory_count++;
 
-
   return virtual_address;
+}
+
+void shmem_fork(int page_number){
+  shared_count[page_number]++;
 }

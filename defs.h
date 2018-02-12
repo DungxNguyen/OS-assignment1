@@ -177,7 +177,8 @@ pde_t*          setupkvm(void);
 char*           uva2ka(pde_t*, char*);
 int             allocuvm(pde_t*, uint, uint);
 int             deallocuvm(pde_t*, uint, uint);
-void            freevm(pde_t*, int);
+void            freevm(pde_t*);
+void            freevm_process(struct proc*);
 //void            freevm_count(pde_t*, int);
 void            inituvm(pde_t*, char*, uint);
 int             loaduvm(pde_t*, char*, struct inode*, uint, uint);
@@ -189,6 +190,7 @@ void            clearpteu(pde_t *pgdir, char *uva);
 int             shmem_count(int);
 void            shmem_init();
 uint            shmem_access(int);
+void            shmem_fork(int);
 
 // number of elements in fixed-size array
 #define NELEM(x) (sizeof(x)/sizeof((x)[0]))

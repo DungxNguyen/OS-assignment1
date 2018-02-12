@@ -189,15 +189,21 @@ fork(void)
     return -1;
   }
 
+  //Copy shared memory
+  np->shared_memory_count = curproc->shared_memory_count;
+  for (i = 0; i < MAX_SHARED_PAGES; i++){
+    if (curproc->shared_memory[i] != 0) {
+      np->shared_memory[i] = curproc->shared_memory[i];
+      shmem_fork(i);
+    }
+  }
+
   // Copy process state from proc.
   if((np->pgdir = copyuvm(curproc->pgdir, curproc->sz)) == 0){
+//    cprintf("Here");
     kfree(np->kstack);
     np->kstack = 0;
     np->state = UNUSED;
-    np->shared_memory_count = curproc->shared_memory_count;
-    for (i = 0; i < MAX_SHARED_PAGES; i++){
-      np->shared_memory[i] = curproc->shared_memory[i];
-    }
     return -1;
   }
   np->sz = curproc->sz;
@@ -293,7 +299,7 @@ wait(void)
         pid = p->pid;
         kfree(p->kstack);
         p->kstack = 0;
-        freevm(p->pgdir, p->shared_memory_count);
+        freevm_process(p);
         p->pid = 0;
         p->parent = 0;
         p->name[0] = 0;
