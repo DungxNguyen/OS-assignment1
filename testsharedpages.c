@@ -18,6 +18,7 @@
 
 int test_simple_test_shared_pages(void);
 int test_fork(void);
+int test_shared_data_fork(void);
 int test_shared_data(void);
 int pid;
 
@@ -40,14 +41,24 @@ int main(int argc, char *argv[]){
     }
     pid = 0;
 
-    if (test_shared_data() == 0) {
-        printf(1, "Shared data test PASSED\n");
+    if (test_shared_data_fork() == 0) {
+        printf(1, "Shared data fork test PASSED\n");
     } else {
-        printf(1, "Shared data test FAILED\n");
+        printf(1, "Shared data fork test FAILED\n");
         if (pid == 0){
             exit();
         }
     }
+    pid = 0;
+
+
+    if (test_shared_data() == 0) {
+        printf(1, "Shared data test PASSED\n");
+    } else {
+        printf(1, "Shared data test FAILED\n");
+    }
+
+
     exit();
 }
 
@@ -112,8 +123,8 @@ int test_fork(void){
     return 0;
 }
 
-int test_shared_data(void){
-    printf(1, "Shared data test\n");
+int test_shared_data_fork(void){
+    printf(1, "Shared data fork test\n");
 
     int values[4] = {1000, 2000, 3000, 4000};
 
@@ -149,3 +160,58 @@ int test_shared_data(void){
 
     return 0;
 }
+
+int test_shared_data(void){
+    printf(1, "Shared data test\n");
+
+    int values[4] = {1000, 2000, 3000, 4000};
+
+
+    for (int i = 0; i < MAX_SHARED_PAGES; i++) {
+        int *ptr = shmem_access(i);
+        *ptr = values[i];
+    }
+
+    pid = fork();
+
+    wait();
+
+    if (pid == 0){
+        for (int i = 0; i < MAX_SHARED_PAGES; i++) {
+            int *ptr = shmem_access(i);
+//            printf(1, "Fork: %x:%d\n", ptr, *ptr);
+            *ptr += i;
+        }
+
+        int c_pid = getpid();
+
+        fork();
+
+        wait();
+
+        if (c_pid != getpid()) {
+
+            for (int i = 0; i < MAX_SHARED_PAGES; i++) {
+                int *ptr = shmem_access(i);
+//            printf(1, "Fork: %x:%d\n", ptr, *ptr);
+                *ptr += i;
+            }
+
+            exit();
+        }
+
+        exit();
+    }
+
+    for (int i = 0; i < MAX_SHARED_PAGES; i++) {
+        int *ptr = shmem_access(i);
+//        printf(1, "Main: %x:%d\n", ptr, *ptr);
+        if (*ptr != values[i] + 2 * i) {
+            return -1;
+        }
+    }
+
+
+    return 0;
+}
+

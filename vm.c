@@ -480,7 +480,7 @@ shmem_init(){
 //      cprintf("init shared mem out of memory\n");
 //      return;
 //    }
-//    memset((void *) shared_memory[i], 0, PGSIZE);
+    memset((void *) shared_memory[i], 0, PGSIZE);
 //    if(mappages(pgdir, (char*)a, PGSIZE, V2P(mem), PTE_W|PTE_U) < 0){
 //      cprintf("allocuvm out of memory (2)\n");
 //      deallocuvm(pgdir, newsz, oldsz);
