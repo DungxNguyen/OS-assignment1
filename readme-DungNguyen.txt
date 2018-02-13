@@ -74,13 +74,15 @@ by function "copyuvm", because the original version doesn't know the existence o
 When the children process dies, freevm_process will take care the virtual space of the shared pages.
 
 ----------------------------------------------------------
-The demo program for the shared pages is "increaseshared", it will print out the values of 4
-1st address of 4 shared pages then increase the values by 1.
+The demo program for the shared pages is "increaseshared", it will print out:
+- the count of processes using shared pages
+- the current values of 4 1st values of 4 shared pages
+- the new values of 4 1st values of 4 shared pages
 $ increaseshared
-0:1
-0:1
-0:1
-0:1
+1:0:1
+1:0:1
+1:0:1
+1:0:1
 
 The test program for the shared page is "testsharedpage" (testsharedpages.c). It run 4 tests:
 1. Simple access and count. The process first request access to shared memory. After the 1st request,
@@ -94,3 +96,7 @@ The parent process then should recognize the changes from the children process.
 
 4. Test multiple forks. Similar to test 3, but in this test, the 1st children process fork a new
 grand-children process and they make changes to the shared pages.
+
+---
+After running "testsharedpage", if you run "increaseshared" you will see the count will be
+reset to 0 (+1 is the increaseshared). 

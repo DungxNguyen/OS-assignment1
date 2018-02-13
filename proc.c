@@ -112,6 +112,10 @@ found:
   memset(p->context, 0, sizeof *p->context);
   p->context->eip = (uint)forkret;
 
+//  p->shared_memory_count = 0;
+//  for (int i = 0; i < MAX_SHARED_PAGES; i++)
+//  p->shared_memory[i] = 0;
+
   return p;
 }
 
@@ -194,12 +198,17 @@ fork(void)
   // Copy the shared memory (information) from parent to children
   np->shared_memory_count = curproc->shared_memory_count;
   for (i = 0; i < MAX_SHARED_PAGES; i++){
+//    np->shared_memory[i] = 0;
     if (curproc->shared_memory[i] != 0) {
       np->shared_memory[i] = curproc->shared_memory[i];
       shmem_fork(i);
     }
   }
 
+//    cprintf("Go here: %d %s %d %s\n", curproc->pid, curproc -> name, np -> pid, np->name);
+//    for (i = 0; i < MAX_SHARED_PAGES; i++){
+//        cprintf("Current - child: %x %x\n", curproc->shared_memory[i], np->shared_memory[i]);
+//    }
   // Copy process state from proc.
   if((np->pgdir = copyuvm(curproc->pgdir, curproc->sz)) == 0){
 //    cprintf("Here");
@@ -229,6 +238,7 @@ fork(void)
   np->state = RUNNABLE;
 
   release(&ptable.lock);
+
 
   return pid;
 }
@@ -305,6 +315,11 @@ wait(void)
         // Use freevm_process
         // The new function can access to proc of process
         // and get the information about the shared pages
+//        cprintf("Go here: %d %s %d %s\n", curproc->pid, curproc -> name, p -> pid, p->name);
+//        cprintf("Go here 0: %d %s %d %s\n", curproc->pid, curproc -> name, p -> pid, p->name);
+//          for (int i = 0; i < MAX_SHARED_PAGES; i++){
+//              cprintf("Current - child: %d %d\n", curproc->shared_memory[i], p->shared_memory[i]);
+//          }
         freevm_process(p);
         p->pid = 0;
         p->parent = 0;

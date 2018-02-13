@@ -334,7 +334,7 @@ freevm_process(struct proc* proc){
   kfree((char*)pgdir);
 
   for (int i = 0; i < MAX_SHARED_PAGES; i++) {
-    if (proc -> shared_memory != 0 ){
+    if (proc -> shared_memory[i] != 0 ){
       shared_count[i] --;
       proc->shared_memory[i] = 0;
     }
