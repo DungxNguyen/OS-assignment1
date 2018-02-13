@@ -46,6 +46,8 @@ void simple_null_test(void){
     printf(1, "Simple null test FAILED\n");
 }
 
+// DUNGN
+// THe fork test copy from forktest
 void fork_test(void) {
     int N = 1000;
     int n, pid;
@@ -83,6 +85,8 @@ void fork_test(void) {
 void null_pointer_param_test(void){
     printf(1, "Null param test\n");
 
+    // DUNGN
+    // Pass a void pointer to the system call
     if (exec((void *) 0, argv) < 0){
         printf(1, "Null param PASSED\n");
         return;

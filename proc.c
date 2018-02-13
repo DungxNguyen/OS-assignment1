@@ -190,6 +190,8 @@ fork(void)
   }
 
   //Copy shared memory
+    // DUNGN
+  // Copy the shared memory (information) from parent to children
   np->shared_memory_count = curproc->shared_memory_count;
   for (i = 0; i < MAX_SHARED_PAGES; i++){
     if (curproc->shared_memory[i] != 0) {
@@ -299,6 +301,10 @@ wait(void)
         pid = p->pid;
         kfree(p->kstack);
         p->kstack = 0;
+        // DUNGN
+        // Use freevm_process
+        // The new function can access to proc of process
+        // and get the information about the shared pages
         freevm_process(p);
         p->pid = 0;
         p->parent = 0;

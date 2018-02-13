@@ -17,7 +17,7 @@ int main(){
         int* ptr = shmem_access(i);
         int old_value = *ptr;
         *ptr += 1;
-        printf(1, "%d:%d\n", old_value, *ptr );
+        printf(1, "%d:%d:%d\n", shmem_count(i), old_value, *ptr );
     }
 
     exit();

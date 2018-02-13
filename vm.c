@@ -319,6 +319,10 @@ freevm_process(struct proc* proc){
   if(pgdir == 0)
     panic("freevm: no pgdir");
 
+  // DUNGN
+  // the new version of freevm
+  // it check the shared memory address,
+  // if exist, doesn't deallocate these addresses
 //  cprintf("FREEVM: %d %s %d\n", proc_shared_memory_offset(), myproc()->name, myproc()->pid);
   deallocuvm(pgdir, KERNBASE  - (proc -> shared_memory_count) * PGSIZE, 0);
   for(i = 0; i < NPDENTRIES; i++){
@@ -398,6 +402,10 @@ copyuvm(pde_t *pgdir, uint sz)
   }
 
   // Critical part here
+  // DUNGN
+  // This part copy the virtual address of shared pages from parent to children
+  // but keep the mapping from virtual space to the same physical space
+  // Make sure that it doesn't mistake the shared pages with heap
   for(i = KERNBASE - PGSIZE; i > sz && i >= KERNBASE - 4 * PGSIZE; i -= PGSIZE)
     if((pte = walkpgdir(pgdir, (void *) i, 0)) != 0)
       if((*pte & PTE_P))
@@ -470,6 +478,11 @@ int shmem_count(int page_number){
   return shared_count[page_number];
 }
 
+
+// DUNGN
+// init mem share
+// run the the boot, allocate 4 pages for sharing
+// then make sure all memory values are set to 0s
 void
 shmem_init(){
   int i;
@@ -490,28 +503,42 @@ shmem_init(){
   }
 }
 
+// DUNGN
+// Access to shared pages
 uint
 shmem_access(int page_number){
 
+  // DUNGN
+  // if the process already access to the shared pages
+  // return the virtual address of the shared pages
   if (myproc()->shared_memory[page_number] != 0){
 //    cprintf("%d %d %d %d\n", myproc()-> shared_memory[0], myproc()-> shared_memory[1], myproc()-> shared_memory[2], myproc()-> shared_memory[3] );
 //    cprintf("%d:%x:%x:%d\n", myproc()->pid, myproc() -> shared_memory[page_number], uva2ka(myproc()->pgdir, (char *) myproc()->shared_memory[page_number] ));
     return myproc()->shared_memory[page_number];
   }
 
+  // if not, increase the count of shared process
   shared_count[page_number]++;
 
+
+  // generate a new virtual address, which is very close to the KERNBASE (max offset of user space)
   uint virtual_address = KERNBASE - proc_shared_memory_offset() * PGSIZE;
 
+
+  // check if heap is smaller than virtual address of shared space
+  // if not, return 0 as unsuccessfully allocate shared pages
   if (virtual_address <= myproc()-> sz)
     return 0;
 
+  // map the virtual address to the physical address (Virtual to physical)
   if (mappages(myproc()->pgdir, (void *) virtual_address, PGSIZE, V2P(shared_memory[page_number]), PTE_W | PTE_U ) < 0){
     cprintf("shared memory cannot map to physical address");
+    // if not successful, doesn't count
     shared_count[page_number]--;
     return 0;
   }
 
+  // update the the shared address to process infomation
   myproc()->shared_memory[page_number] = virtual_address;
   myproc()->shared_memory_count++;
 

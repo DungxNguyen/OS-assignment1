@@ -43,6 +43,9 @@ exec(char *path, char **argv)
 
   // Project 2A Code segment starts
 //  cprintf("Size: %d\n", sz);
+  // DUNGN
+  // Allocate the 1st page
+  // Then make it inaccessible
   if((sz = allocuvm(pgdir, sz, sz + PGSIZE)) == 0)
     goto bad;
   clearpteu(pgdir, (char*)(sz - PGSIZE));
