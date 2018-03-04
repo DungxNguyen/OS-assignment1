@@ -227,10 +227,12 @@ fork(void)
 void
 exit(void)
 {
+
   struct proc *curproc = myproc();
   struct proc *p;
   int fd;
 
+  //cprintf("Exit on %d\n", curproc->pid);
   if(curproc == initproc)
     panic("init exiting");
 
@@ -272,6 +274,7 @@ exit(void)
 int
 wait(void)
 {
+  cprintf("Wait called\n");
   struct proc *p;
   int havekids, pid;
   struct proc *curproc = myproc();
@@ -530,5 +533,119 @@ procdump(void)
         cprintf(" %p", pc[i]);
     }
     cprintf("\n");
+  }
+}
+
+int
+proc_clone(void(*fcn) (void*), void *arg, void*stack){
+
+  int i, pid;
+  struct proc *np;
+  struct proc *curproc = myproc();
+
+  // Allocate process.
+  if((np = allocproc()) == 0){
+    return -1;
+  }
+
+  // Copy process state from proc.
+  // if((np->pgdir = copyuvm(curproc->pgdir, curproc->sz)) == 0){
+  //   kfree(np->kstack);
+  //   np->kstack = 0;
+  //   np->state = UNUSED;
+  //   return -1;
+  // }
+  np->state = UNUSED;
+  np->pgdir = curproc->pgdir;
+  np->sz = curproc->sz;
+  np->parent = curproc;
+  *np->tf = *curproc->tf;
+
+  // Clear %eax so that fork returns 0 in the child.
+  np->tf->eax = 0;
+
+  for(i = 0; i < NOFILE; i++)
+    if(curproc->ofile[i])
+      np->ofile[i] = filedup(curproc->ofile[i]);
+  np->cwd = idup(curproc->cwd);
+
+  safestrcpy(np->name, curproc->name, sizeof(curproc->name));
+
+  pid = np->pid;
+
+  // set arg
+  *((uint*)((uint)stack + PGSIZE - sizeof(uint))) = 0xffffffff;
+  *((uint*)((uint)stack + PGSIZE - 2 * sizeof(uint))) = (uint)arg;
+
+  // Set stack base
+  np->tf->ebp = (uint) stack + PGSIZE ;//- 2 * sizeof(uint);
+
+  // Set instruction pointer
+  np->tf->eip = (uint) fcn;
+
+  // Set stack pointer:
+  np->tf->esp = (uint) stack + PGSIZE - 2*sizeof(uint); 
+
+  if (pid == 4){
+    cprintf("arg %x\n", (uint) arg);
+    cprintf("0xff %x\n",  0xffffffff);
+    cprintf("return address %x\n",  (uint)stack + PGSIZE - sizeof(uint));
+    cprintf("return value %x\n", *((uint*)((uint)stack + PGSIZE - sizeof(uint))));
+    cprintf("stack %x\n", stack);
+    cprintf("stack + PGSIZE %x\n", (uint)stack + PGSIZE);
+    cprintf("esp %x\n", np->tf->esp);
+    cprintf("*esp %x\n", *(uint *)np->tf->esp);
+    cprintf("*esp + 1 %x\n", *(uint *)(np->tf->esp + sizeof(uint)));
+  }
+
+  acquire(&ptable.lock);
+
+  np->state = RUNNABLE;
+
+  release(&ptable.lock);
+
+  return pid;
+}
+
+int
+proc_join(int pid){
+  cprintf("Join called on %d\n", pid);
+  struct proc *p;
+  int havekids;
+  struct proc *curproc = myproc();
+  
+  acquire(&ptable.lock);
+  for(;;){
+    // Scan through table looking for exited children.
+    havekids = 0;
+    for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
+      if(p->parent != curproc && p->pid == pid)
+        continue;
+      havekids = 1;
+      if(p->state == ZOMBIE){
+        // Found one.
+        kfree(p->kstack);
+        p->kstack = 0;
+        // freevm(p->pgdir);
+        p->pid = 0;
+        p->parent = 0;
+        p->name[0] = 0;
+        p->killed = 0;
+        p->state = UNUSED;
+        release(&ptable.lock);
+        return pid;
+      }
+    }
+
+    // No point waiting if we don't have any children.
+    if(!havekids || curproc->killed){
+      release(&ptable.lock);
+      return -1;
+    }
+
+    //cprintf("Sleep to wait for %d\n", pid);
+    // Wait for children to exit.  (See wakeup1 call in proc_exit.)
+    sleep(curproc, &ptable.lock);  //DOC: wait-sleep
+    //cprintf("Wake up for %d\n", pid);
   }
 }

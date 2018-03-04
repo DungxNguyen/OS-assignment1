@@ -120,6 +120,8 @@ void            userinit(void);
 int             wait(void);
 void            wakeup(void*);
 void            yield(void);
+int             proc_clone(void(*fcn) (void*), void *, void*);
+int             proc_join(int);
 
 // swtch.S
 void            swtch(struct context**, struct context*);
