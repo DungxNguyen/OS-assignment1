@@ -66,7 +66,7 @@ void consumer(void* arg)
         lock_release(&lock);
         #endif
     }
-    //printf(1, "Consumer end\n");
+    printf(1, "Consumer end\n");
     printf(1, "consumer %d consumed: %d\n", *(int*)arg, consumed);
 
 
@@ -108,6 +108,8 @@ int main(void)
     int indices[NUM_CONS];
     kthread_t producers[NUM_PROD];
     kthread_t consumers[NUM_CONS];
+    for (i = 0; i < NUM_CONS; i++)
+      printf(1, "indices %d: %x\n", i, &indices[i]);
     for (i = 0; i < NUM_CONS; i++)
     {
         indices[i] = i;
