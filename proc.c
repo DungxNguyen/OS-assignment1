@@ -574,8 +574,8 @@ proc_clone(void(*fcn) (void*), void *arg, void*stack){
   pid = np->pid;
 
   // set arg
-  *((uint*)((uint)stack + PGSIZE - sizeof(uint))) = 0xffffffff;
-  *((uint*)((uint)stack + PGSIZE - 2 * sizeof(uint))) = (uint)arg;
+  *((uint*)((uint)stack + PGSIZE - sizeof(uint))) = (uint)arg;
+  *((uint*)((uint)stack + PGSIZE - 2 * sizeof(uint))) = 0xffffffff;
 
   // Set stack base
   np->tf->ebp = (uint) stack + PGSIZE ;//- 2 * sizeof(uint);
@@ -588,6 +588,7 @@ proc_clone(void(*fcn) (void*), void *arg, void*stack){
 
   if (pid == 4){
     cprintf("arg %x\n", (uint) arg);
+    cprintf("arg value %d\n", *(uint*)arg);
     cprintf("0xff %x\n",  0xffffffff);
     cprintf("return address %x\n",  (uint)stack + PGSIZE - sizeof(uint));
     cprintf("return value %x\n", *((uint*)((uint)stack + PGSIZE - sizeof(uint))));

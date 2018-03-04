@@ -67,7 +67,7 @@ void consumer(void* arg)
         #endif
     }
     printf(1, "Consumer end\n");
-    printf(1, "consumer %d consumed: %d\n", *(int*)arg, consumed);
+    printf(1, "consumer %d consumed: %d\n", *(uint*)arg, consumed);
 
 
     exit();
