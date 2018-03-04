@@ -66,8 +66,9 @@ void consumer(void* arg)
         lock_release(&lock);
         #endif
     }
-    printf(1, "Consumer end\n");
+    lock_acquire(&lock);
     printf(1, "consumer %d consumed: %d\n", *(uint*)arg, consumed);
+    lock_release(&lock);
 
 
     exit();

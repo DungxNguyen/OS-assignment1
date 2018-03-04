@@ -21,16 +21,16 @@ void thread_join(struct kthread thread){
   join(thread.pid);
 }
 
-void lock_acquire(lock_t * lock){
-  while (xchg(&(lock->lock_value), 1) == 1){
+void lock_acquire(volatile lock_t * lock){
+  while (xchg(lock, 1) == 1){
   }
 }
 
-void lock_release(lock_t * lock){
-  while (xchg(&(lock->lock_value), 0) == 0){
+void lock_release(volatile lock_t * lock){
+  while (xchg(lock, 0) == 0){
   }
 }
 
 void init_lock(lock_t * lock){
-  lock->lock_value = 0;
+  *lock = 0;
 }
