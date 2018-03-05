@@ -30,6 +30,8 @@
 #define LOCKS_ON 1
 #define NULL 0
 
+void consumer(void* arg);
+void producer(void* arg);
 
 // global lock for product
 lock_t lock;
@@ -39,13 +41,24 @@ int things_made = 0;
 #define MAX_CONSUME 3000000
 void consumer(void* arg)
 {
-    //printf(1, "Consumer start\n");
+    #if LOCKS_ON
+    lock_acquire(&lock);
+    #endif
+    kthread_t grand_child;
+    if (*(int*)arg == 0){
+      grand_child = thread_create(producer, NULL);
+    }
+    printf(1, "Consumer %d start\n", *(int*) arg);
+    #if LOCKS_ON
+    lock_release(&lock);
+    #endif
+
+
     int i;
     int consumed = 0;
     // dumb little busy sleep
     for (i = 0; i < 200; i++){
     }
-
     
     while (consumed < MAX_CONSUME)
     {
@@ -67,7 +80,8 @@ void consumer(void* arg)
         #endif
     }
     lock_acquire(&lock);
-    printf(1, "consumer %d consumed: %d\n", *(uint*)arg, consumed);
+    printf(1, "consumer %d consumed: %d\n", *(int*)arg, consumed);
+    thread_join(grand_child);
     lock_release(&lock);
 
 
@@ -80,6 +94,7 @@ void consumer(void* arg)
 void producer(void* arg)
 {
     int cont = 1;
+    int my_thing = 0;
     while (cont)
     {
         #if LOCKS_ON
@@ -90,6 +105,7 @@ void producer(void* arg)
         {
             ++things;
             ++things_made;
+            my_thing++;
         }
         else
         {
@@ -99,6 +115,9 @@ void producer(void* arg)
         lock_release(&lock);
         #endif
     }
+    lock_acquire(&lock);
+    printf(1, "My products: %d\n", my_thing);
+    lock_release(&lock);
     exit();
 }
 
@@ -109,8 +128,8 @@ int main(void)
     int indices[NUM_CONS];
     kthread_t producers[NUM_PROD];
     kthread_t consumers[NUM_CONS];
-    for (i = 0; i < NUM_CONS; i++)
-      printf(1, "indices %d: %x\n", i, &indices[i]);
+    //for (i = 0; i < NUM_CONS; i++)
+    //  printf(1, "indices %d: %x\n", i, &indices[i]);
     for (i = 0; i < NUM_CONS; i++)
     {
         indices[i] = i;
@@ -120,6 +139,20 @@ int main(void)
     {
         producers[i] = thread_create(producer, NULL);
     }
+
+    // Test if wait child thread
+    if (wait() == -1) {
+      lock_acquire(&lock);
+      printf(1, "Wait correctly: Nothing to wait for\n");
+      lock_release(&lock);
+    }else{
+      lock_acquire(&lock);
+      printf(1, "Wait incorrectly\n");
+      lock_release(&lock);
+    }
+    // end wait test
+
+      
     for (i = 0; i < NUM_PROD; i++)
     {
         thread_join(producers[i]);

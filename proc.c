@@ -88,6 +88,7 @@ allocproc(void)
 found:
   p->state = EMBRYO;
   p->pid = nextpid++;
+  p->thread = 0;
 
   release(&ptable.lock);
 
@@ -254,12 +255,29 @@ exit(void)
   // Parent might be sleeping in wait().
   wakeup1(curproc->parent);
 
-  // Pass abandoned children to init.
-  for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
-    if(p->parent == curproc){
-      p->parent = initproc;
-      if(p->state == ZOMBIE)
-        wakeup1(initproc);
+  if (curproc->thread == 1) {
+    // This is thread;
+    // Thread does not abandon child thread to init but my father
+    for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
+      if(p->parent == curproc) {
+        p->parent = curproc->parent;
+      }
+    }
+  } else {
+    // This is process
+    for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
+      if(p->parent == curproc) {
+        if(p->thread == 1){
+          // kill all children thread
+          kill(p->pid);
+          proc_join(p->pid);
+        }else{
+          // Pass abandoned children process to init.
+          p->parent = initproc;
+          if(p->state == ZOMBIE)
+            wakeup1(initproc);
+        }
+      }
     }
   }
 
@@ -274,7 +292,7 @@ exit(void)
 int
 wait(void)
 {
-  cprintf("Wait called\n");
+  //cprintf("Wait called\n");
   struct proc *p;
   int havekids, pid;
   struct proc *curproc = myproc();
@@ -284,15 +302,28 @@ wait(void)
     // Scan through table looking for exited children.
     havekids = 0;
     for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
-      if(p->parent != curproc)
+      // Does not wait for child thread
+      if(p->parent != curproc || p->pgdir == curproc->pgdir)
         continue;
       havekids = 1;
+      int is_p_the_last_reference = 1;
       if(p->state == ZOMBIE){
+        // Check if p is the last reference of its family tree
+        struct proc *p2;
+        for(p2 = ptable.proc; p2 < &ptable.proc[NPROC]; p2++){
+          if(p2->state != UNUSED && p2->pgdir == p->pgdir) {
+            // p is not the last reference
+            is_p_the_last_reference = 0;
+          }
+        }
         // Found one.
         pid = p->pid;
         kfree(p->kstack);
         p->kstack = 0;
-        freevm(p->pgdir);
+        if (is_p_the_last_reference == 1){
+          // when p is the last ref, free the memory
+          freevm(p->pgdir);
+        }
         p->pid = 0;
         p->parent = 0;
         p->name[0] = 0;
@@ -578,26 +609,29 @@ proc_clone(void(*fcn) (void*), void *arg, void*stack){
   *((uint*)((uint)stack + PGSIZE - 2 * sizeof(uint))) = 0xffffffff;
 
   // Set stack base
-  np->tf->ebp = (uint) stack + PGSIZE ;//- 2 * sizeof(uint);
+  // np->tf->ebp = (uint) stack + PGSIZE ;//- 2 * sizeof(uint);
 
   // Set instruction pointer
   np->tf->eip = (uint) fcn;
 
   // Set stack pointer:
-  np->tf->esp = (uint) stack + PGSIZE - 2*sizeof(uint); 
+  np->tf->esp = (uint) stack + PGSIZE - 2 * sizeof(uint); 
 
-  if (pid == 4){
-    cprintf("arg %x\n", (uint) arg);
-    cprintf("arg value %d\n", *(uint*)arg);
-    cprintf("0xff %x\n",  0xffffffff);
-    cprintf("return address %x\n",  (uint)stack + PGSIZE - sizeof(uint));
-    cprintf("return value %x\n", *((uint*)((uint)stack + PGSIZE - sizeof(uint))));
-    cprintf("stack %x\n", stack);
-    cprintf("stack + PGSIZE %x\n", (uint)stack + PGSIZE);
-    cprintf("esp %x\n", np->tf->esp);
-    cprintf("*esp %x\n", *(uint *)np->tf->esp);
-    cprintf("*esp + 1 %x\n", *(uint *)(np->tf->esp + sizeof(uint)));
-  }
+  // Set thread
+  np->thread = 1;
+
+  //if (pid == 4){
+  //  cprintf("arg %x\n", (uint) arg);
+  //  cprintf("arg value %d\n", *(uint*)arg);
+  //  cprintf("0xff %x\n",  0xffffffff);
+  //  cprintf("return address %x\n",  (uint)stack + PGSIZE - sizeof(uint));
+  //  cprintf("return value %x\n", *((uint*)((uint)stack + PGSIZE - sizeof(uint))));
+  //  cprintf("stack %x\n", stack);
+  //  cprintf("stack + PGSIZE %x\n", (uint)stack + PGSIZE);
+  //  cprintf("esp %x\n", np->tf->esp);
+  //  cprintf("*esp %x\n", *(uint *)np->tf->esp);
+  //  cprintf("*esp + 1 %x\n", *(uint *)(np->tf->esp + sizeof(uint)));
+  //}
 
   acquire(&ptable.lock);
 
@@ -610,7 +644,7 @@ proc_clone(void(*fcn) (void*), void *arg, void*stack){
 
 int
 proc_join(int pid){
-  cprintf("Join called on %d\n", pid);
+  //cprintf("Join called on %d\n", pid);
   struct proc *p;
   int havekids;
   struct proc *curproc = myproc();
@@ -620,7 +654,7 @@ proc_join(int pid){
     // Scan through table looking for exited children.
     havekids = 0;
     for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
-      if(p->parent != curproc && p->pid == pid)
+      if(p->parent != curproc || p->pid != pid)
         continue;
       havekids = 1;
       if(p->state == ZOMBIE){
@@ -632,6 +666,7 @@ proc_join(int pid){
         p->parent = 0;
         p->name[0] = 0;
         p->killed = 0;
+        p->thread = 0;
         p->state = UNUSED;
         release(&ptable.lock);
         return pid;
