@@ -39,7 +39,7 @@ int things_made = 0;
 #define MAX_CONSUME 3000000
 void consumer(void* arg)
 {
-    printf(1, "Consumer start\n");
+    //printf(1, "Consumer start\n");
     int i;
     int consumed = 0;
     // dumb little busy sleep
