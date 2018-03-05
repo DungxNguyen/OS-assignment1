@@ -579,6 +579,8 @@ proc_clone(void(*fcn) (void*), void *arg, void*stack){
     return -1;
   }
 
+  cprintf("Go clone %d\n", *(int*) arg);
+
   // Copy process state from proc.
   // if((np->pgdir = copyuvm(curproc->pgdir, curproc->sz)) == 0){
   //   kfree(np->kstack);

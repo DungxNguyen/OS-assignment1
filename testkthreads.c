@@ -38,6 +38,8 @@ lock_t lock;
 // our product
 int things = 0;
 int things_made = 0;
+int ONE = 1111;
+int TWO = 2222;
 #define MAX_CONSUME 3000000
 void consumer(void* arg)
 {
@@ -46,7 +48,7 @@ void consumer(void* arg)
     #endif
     kthread_t grand_child;
     if (*(int*)arg == 0){
-      grand_child = thread_create(producer, NULL);
+      grand_child = thread_create(producer, &ONE);
     }
     printf(1, "Consumer %d start\n", *(int*) arg);
     #if LOCKS_ON
