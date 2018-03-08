@@ -43,17 +43,17 @@ int TWO = 2222;
 #define MAX_CONSUME 3000000
 void consumer(void* arg)
 {
-    #if LOCKS_ON
     lock_acquire(&lock);
-    #endif
     kthread_t grand_child;
-    if (*(int*)arg == 0){
+    if (*(int*)arg == 0)
+    {
       grand_child = thread_create(producer, &ONE);
+    } else{
+      grand_child = thread_create(producer, &TWO);
+      //printf(1, "Child %d start: %d\n", *(int*) arg, grand_child.pid);
     }
     printf(1, "Consumer %d start\n", *(int*) arg);
-    #if LOCKS_ON
     lock_release(&lock);
-    #endif
 
 
     int i;
@@ -67,9 +67,7 @@ void consumer(void* arg)
         // not thread safe but give producers time
         // printf(1, "Go here %d: %d\n", *(int*)arg, consumed);
         while(things <= 0);
-        #if LOCKS_ON
         lock_acquire(&lock);
-        #endif
         if (things > 0)
         {
             // useful consumption of resources algorithm
@@ -77,15 +75,13 @@ void consumer(void* arg)
             --things;
             ++consumed;
         }
-        #if LOCKS_ON
         lock_release(&lock);
-        #endif
     }
     lock_acquire(&lock);
     printf(1, "consumer %d consumed: %d\n", *(int*)arg, consumed);
-    thread_join(grand_child);
     lock_release(&lock);
 
+    thread_join(grand_child);
 
     exit();
 }
@@ -99,9 +95,7 @@ void producer(void* arg)
     int my_thing = 0;
     while (cont)
     {
-        #if LOCKS_ON
         lock_acquire(&lock);
-        #endif
         // magical producing algorithm
         if (things_made < TOTAL_PRODUCTS)
         {
@@ -113,9 +107,7 @@ void producer(void* arg)
         {
             cont = 0;
         }
-        #if LOCKS_ON
         lock_release(&lock);
-        #endif
     }
     lock_acquire(&lock);
     printf(1, "My products: %d\n", my_thing);

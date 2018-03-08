@@ -101,8 +101,9 @@ sys_clone(void)
     return -1;
   if (argptr(1, (void*) &arg, sizeof(void*)) < 0)
     return -1;
-  if (argptr(2, (void*) &stack, sizeof(void*)) < 0)
+  if (argptr(2, (void*) &stack, sizeof(void*)) < 0) {
     return -1;
+  }
 
   return proc_clone(fcn, arg, stack);
 }

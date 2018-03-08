@@ -5,12 +5,19 @@
 #include "mmu.h"
 #include "x86.h"
 
+lock_t s_lock = 0;
+
 struct kthread thread_create(void (*start_routine)(void*), void *arg){
   struct kthread new_thread;
 
+  lock_acquire(&s_lock);
   void *stack = malloc(PGSIZE * 2);
 
-  stack = (void*)(stack - (uint)stack % PGSIZE + PGSIZE);
+  //printf(1, "Malloc for %d: %x \n", *(int *) arg, (uint) stack);
+  stack = (void*)((uint)stack - (uint)stack % PGSIZE + PGSIZE);
+
+  //printf(1, "Stack for %d: %x \n", *(int *) arg, (uint) stack);
+  lock_release(&s_lock);
 
   new_thread.pid = clone(start_routine, arg, stack);
 

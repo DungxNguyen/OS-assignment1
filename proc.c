@@ -171,6 +171,15 @@ growproc(int n)
       return -1;
   }
   curproc->sz = sz;
+  // BEGIN edit
+  // update all shared pgdir size here
+  struct proc *p;
+  for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
+    if(p->pgdir == curproc->pgdir){
+      p->sz = sz;
+    }
+  }
+  // END Edit
   switchuvm(curproc);
   return 0;
 }
@@ -574,12 +583,13 @@ proc_clone(void(*fcn) (void*), void *arg, void*stack){
   struct proc *np;
   struct proc *curproc = myproc();
 
+  //cprintf("Go clone %d. Stack: %x\n", *(int*) arg, (uint) stack);
+
   // Allocate process.
   if((np = allocproc()) == 0){
     return -1;
   }
 
-  cprintf("Go clone %d\n", *(int*) arg);
 
   // Copy process state from proc.
   // if((np->pgdir = copyuvm(curproc->pgdir, curproc->sz)) == 0){
