@@ -278,8 +278,8 @@ exit(void)
       if(p->parent == curproc) {
         if(p->thread == 1){
           // kill all children thread
-          kill(p->pid);
-          proc_join(p->pid);
+          //kill(p->pid);
+          //proc_join(p->pid);
         }else{
           // Pass abandoned children process to init.
           p->parent = initproc;
