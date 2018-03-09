@@ -10,7 +10,7 @@ typedef uint lock_t;
 
 struct kthread thread_create(void (*start_routine)(void*), void *arg);
 
-void thread_join(struct kthread);
+int thread_join(struct kthread);
 
 void lock_acquire(volatile lock_t *);
 

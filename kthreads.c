@@ -24,8 +24,8 @@ struct kthread thread_create(void (*start_routine)(void*), void *arg){
   return new_thread;
 }
 
-void thread_join(struct kthread thread){
-  join(thread.pid);
+int thread_join(struct kthread thread){
+  return join(thread.pid);
 }
 
 void lock_acquire(volatile lock_t * lock){
