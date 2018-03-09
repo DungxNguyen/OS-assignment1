@@ -637,8 +637,6 @@ proc_clone(void(*fcn) (void*), void *arg, void*stack){
   pid = np->pid;
 
   // set arg
-  // *((uint*)((uint)stack + PGSIZE - sizeof(uint))) = (uint)arg;
-  // *((uint*)((uint)stack + PGSIZE - 2 * sizeof(uint))) = 0xffffffff;
 
   // Set instruction pointer
   np->tf->eip = (uint) fcn;

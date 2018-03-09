@@ -1,9 +1,11 @@
 1. Test cases:
 
-I checked with your original test and it passed. My modified tests are:
+I checked with your original test and it passed. My modified tests are: (all PASSED).
 
 -testkthreads :
 pretty much like your test, but each consumer call a producer thread, which ends up we have 5 producers at different levels (3 are child threads, 2 are grand child threads)
+
+It also test wait(): wait() should not wait for thread but child process only.
 
 -testkthreads2 : 
 This test case demonstrate multi-level of thread. 
@@ -28,9 +30,13 @@ Expected behavior: When main process exit, all of its threads will be killed.
                    The test program should exit successfully, after that there is no zombie
                    (check by Ctrl-P)
 
+2. Makefile
+This submission run with 4 cpu and kvm enabled.
 
+CPUS := 4
+QEMUOPTS = -drive file=fs.img,index=1,media=disk,format=raw -drive file=xv6.img,index=0,media=disk,format=raw -smp $(CPUS) -m 512 $(QEMUEXTRA) -enable-kvm
 
-2. Implementations:
+3. Implementations:
 
 --------function clone in proc.c---------------
 
