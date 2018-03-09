@@ -637,33 +637,19 @@ proc_clone(void(*fcn) (void*), void *arg, void*stack){
   pid = np->pid;
 
   // set arg
-  *((uint*)((uint)stack + PGSIZE - sizeof(uint))) = (uint)arg;
-  *((uint*)((uint)stack + PGSIZE - 2 * sizeof(uint))) = 0xffffffff;
-
-  // Set stack base
-  // np->tf->ebp = (uint) stack + PGSIZE ;//- 2 * sizeof(uint);
+  // *((uint*)((uint)stack + PGSIZE - sizeof(uint))) = (uint)arg;
+  // *((uint*)((uint)stack + PGSIZE - 2 * sizeof(uint))) = 0xffffffff;
 
   // Set instruction pointer
   np->tf->eip = (uint) fcn;
 
   // Set stack pointer:
   np->tf->esp = (uint) stack + PGSIZE - 2 * sizeof(uint); 
+  *(uint*)np->tf->esp = 0xffffffff;
+  *(uint*)(np->tf->esp + sizeof(uint)) = (uint) arg;
 
   // Set thread
   np->thread = 1;
-
-  //if (pid == 4){
-  //  cprintf("arg %x\n", (uint) arg);
-  //  cprintf("arg value %d\n", *(uint*)arg);
-  //  cprintf("0xff %x\n",  0xffffffff);
-  //  cprintf("return address %x\n",  (uint)stack + PGSIZE - sizeof(uint));
-  //  cprintf("return value %x\n", *((uint*)((uint)stack + PGSIZE - sizeof(uint))));
-  //  cprintf("stack %x\n", stack);
-  //  cprintf("stack + PGSIZE %x\n", (uint)stack + PGSIZE);
-  //  cprintf("esp %x\n", np->tf->esp);
-  //  cprintf("*esp %x\n", *(uint *)np->tf->esp);
-  //  cprintf("*esp + 1 %x\n", *(uint *)(np->tf->esp + sizeof(uint)));
-  //}
 
   acquire(&ptable.lock);
 
