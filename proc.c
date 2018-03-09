@@ -267,6 +267,9 @@ exit(void)
   if (curproc->thread == 1) {
     // This is thread;
     // Thread does not abandon child thread to init but my father
+    //if (curproc->state == UNUSED){
+    //  cprintf("teng teng\n");
+    //}
     for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
       if(p->parent == curproc) {
         p->parent = curproc->parent;
@@ -278,8 +281,24 @@ exit(void)
       if(p->parent == curproc) {
         if(p->thread == 1){
           // kill all children thread
-          //kill(p->pid);
-          //proc_join(p->pid);
+          if(p->state == ZOMBIE){
+            // Found one.
+            kfree(p->kstack);
+            p->kstack = 0;
+            p->pid = 0;
+            p->parent = 0;
+            p->name[0] = 0;
+            p->killed = 0;
+            p->thread = 0;
+            p->state = UNUSED;
+          } else {
+            p->pid = 0;
+            p->parent = 0;
+            p->name[0] = 0;
+            p->killed = 0;
+            p->thread = 0;
+            p->state = UNUSED;
+          }
         }else{
           // Pass abandoned children process to init.
           p->parent = initproc;
@@ -333,6 +352,7 @@ wait(void)
           // when p is the last ref, free the memory
           freevm(p->pgdir);
         }
+        //cprintf("clear %d, with parent %d, by %d\n", p->pid, p->parent->pid, curproc -> pid);
         p->pid = 0;
         p->parent = 0;
         p->name[0] = 0;
@@ -566,7 +586,7 @@ procdump(void)
       state = states[p->state];
     else
       state = "???";
-    cprintf("%d %s %s", p->pid, state, p->name);
+    cprintf("%d %s %s ", p->pid, state, p->name);
     if(p->state == SLEEPING){
       getcallerpcs((uint*)p->context->ebp+2, pc);
       for(i=0; i<10 && pc[i] != 0; i++)

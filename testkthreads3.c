@@ -30,7 +30,7 @@ void thread_child(void* arg)
 
 void thread_grandchild(void* arg)
 {
-  sleep(200);
+  sleep(500);
   exit();
 }
 

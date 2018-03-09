@@ -28,7 +28,7 @@ int main(void)
 {
   kthread_t child = thread_create(thread_child, &CHILD);
 
-  sleep(200);
+  sleep(500);
 
   if (thread_join(child) == child.pid)
     printf(1, "Test PASSED\n");

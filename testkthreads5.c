@@ -1,6 +1,8 @@
 /*
   This test demonstrate when main process doesn't call join()
-  Expected behavior: When main process exit, all of its threads will be killed  
+  Expected behavior: When main process exit, all of its threads will be killed.
+                     The test program should exit successfully, after that there is no zombie
+                     (check by Ctrl-P)
                      
  */
 
@@ -23,12 +25,18 @@ int GRANDCHILD = 2222;
 
 void thread_child(void* arg)
 {
-  //while(1);
+  while(1);
   exit();
 }
 
 int main(void)
 {
-  thread_create(thread_child, &CHILD);
+  int fid = fork();
+  if (fid == 0){
+    thread_create(thread_child, &CHILD);
+    exit();
+  }
+  wait();
+  printf(1, "Test PASSED\n");
   exit();
 }
