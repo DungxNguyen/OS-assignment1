@@ -1,0 +1,3 @@
+make clean;
+
+rsync -prvzc ./ dungn@access.cs.clemson.edu:OS-assignment1/ --exclude .git/ --exclude cmake-build-debug --exclude .idea;
