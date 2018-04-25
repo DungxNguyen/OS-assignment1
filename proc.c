@@ -6,6 +6,7 @@
 #include "x86.h"
 #include "proc.h"
 #include "spinlock.h"
+#include "pstat.h"
 
 struct {
   struct spinlock lock;
@@ -88,6 +89,9 @@ allocproc(void)
 found:
   p->state = EMBRYO;
   p->pid = nextpid++;
+  p->priority = 1;
+  p->lticks = 0;
+  p->hticks = 0;
 
   release(&ptable.lock);
 
@@ -294,6 +298,9 @@ wait(void)
         p->parent = 0;
         p->name[0] = 0;
         p->killed = 0;
+        p->priority = 0;
+        p->lticks = 0;
+        p->hticks = 0;
         p->state = UNUSED;
         release(&ptable.lock);
         return pid;
@@ -336,6 +343,10 @@ scheduler(void)
       if(p->state != RUNNABLE)
         continue;
 
+      // Dungn if p is a low priority when there is high priority process, pass
+      if(p->priority == 1 && highPriorityExisted())
+        continue;
+
       // Switch to chosen process.  It is the process's job
       // to release ptable.lock and then reacquire it
       // before jumping back to us.
@@ -343,15 +354,31 @@ scheduler(void)
       switchuvm(p);
       p->state = RUNNING;
 
+      // Dungn ticks count
+      acquire(&tickslock);
+      uint tick_mark_start = ticks;
+      release(&tickslock);
+
       swtch(&(c->scheduler), p->context);
       switchkvm();
+
+      acquire(&tickslock);
+      uint tick_mark_finish = ticks;
+      release(&tickslock);
+
+      int tickcount = (int) (tick_mark_finish - tick_mark_start);
+
+      if(p->priority == 1){
+        p->lticks += tickcount;
+      }else{
+        p->hticks += tickcount; 
+      }
 
       // Process is done running for now.
       // It should have changed its p->state before coming back.
       c->proc = 0;
     }
     release(&ptable.lock);
-
   }
 }
 
@@ -532,3 +559,43 @@ procdump(void)
     cprintf("\n");
   }
 }
+
+
+int
+setpri(int num){
+  myproc()->priority = num;
+
+  return 0;
+}
+
+int
+getpinfo(struct pstat * pstatresult){
+  struct proc *p;
+  int i = 0;
+  acquire(&ptable.lock);
+  for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
+    if(p -> state == UNUSED){
+      pstatresult[i++]->inuse = 0;
+      continue;
+    }
+    pstatresult[i]->inuse = 1;
+    pstatresult[i]->pid = p->pid;
+    pstatresult[i]->hticks = p->hticks;
+    pstatresult[i++]->lticks = p->lticks;
+  }
+  release(&ptable.lock);
+  return 0;
+}
+
+int
+highPriorityExisted(){
+  struct proc *p;
+  for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
+    if(p->state == UNUSED){
+      continue;
+    }
+    if(p->priority == 2)
+      return 1;
+  }
+  return 0;
+}  
