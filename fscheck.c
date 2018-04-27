@@ -64,9 +64,15 @@ xint(uint x)
   return y;
 }
 
-int checkBadInode();
-int checkBadAddressInInode();
-int checkRootDir();
+int checkBadInode(); //1
+int checkBadAddressInInode(); //2
+int checkRootDir(); //3
+int checkDirFormat(); //4
+int checkParentDir(); //5
+int checkUsedInodeBitmap(); //6
+int checkUsedBitmap(); //7
+int checkAddressInUsedOnce(); //8
+
 
 int main(int argc, char *argv[]){
   uchar buf[BSIZE];
@@ -88,10 +94,12 @@ int main(int argc, char *argv[]){
   nmeta = 2 + nlog + ninodeblocks + nbitmap;
   nblocks = sb.size - nmeta;
 
-  checkBadInode();
-  checkBadAddressInInode();
-  checkRootDir();
+  checkBadInode(); //1
+  checkBadAddressInInode(); //2
+  checkRootDir(); //3
 
+  close(fsfd);
+  exit(0);
 }
 
 int checkRootDir(){
