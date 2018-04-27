@@ -360,12 +360,12 @@ scheduler(void)
       release(&tickslock);
 
       swtch(&(c->scheduler), p->context);
-      switchkvm();
 
       acquire(&tickslock);
       uint tick_mark_finish = ticks;
       release(&tickslock);
 
+      // cprintf("%x %x\n", tick_mark_finish, tick_mark_start);
       int tickcount = (int) (tick_mark_finish - tick_mark_start);
 
       if(p->priority == 1){
@@ -374,6 +374,7 @@ scheduler(void)
         p->hticks += tickcount; 
       }
 
+      switchkvm();
       // Process is done running for now.
       // It should have changed its p->state before coming back.
       c->proc = 0;
@@ -575,13 +576,16 @@ getpinfo(struct pstat * pstatresult){
   acquire(&ptable.lock);
   for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
     if(p -> state == UNUSED){
-      pstatresult[i++]->inuse = 0;
+      pstatresult->inuse[i] = 0;
+      i++;
       continue;
     }
-    pstatresult[i]->inuse = 1;
-    pstatresult[i]->pid = p->pid;
-    pstatresult[i]->hticks = p->hticks;
-    pstatresult[i++]->lticks = p->lticks;
+    pstatresult->inuse[i] = 1;
+    pstatresult->pid[i] = p->pid;
+    safestrcpy(pstatresult->pname[i], p->name, sizeof(p->name));
+    pstatresult->hticks[i] = p->hticks;
+    pstatresult->lticks[i] = p->lticks;
+    i++;
   }
   release(&ptable.lock);
   return 0;
@@ -591,7 +595,7 @@ int
 highPriorityExisted(){
   struct proc *p;
   for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
-    if(p->state == UNUSED){
+    if(p->state != RUNNABLE && p->state != RUNNING){
       continue;
     }
     if(p->priority == 2)
