@@ -29,8 +29,8 @@ void iappend(uint inum, void *p, int n);
 // Disk layout:
 // [ boot block | sb block | log | inode blocks | free bit map | data blocks ]
 
-int nbitmap = FSSIZE/(BSIZE*8) + 1;
-int ninodeblocks = NINODES / IPB + 1;
+int nbitmap; 
+int ninodeblocks;
 int nlog = LOGSIZE;
 int nmeta;    // Number of meta blocks (boot, sb, nlog, inode, bitmap)
 int nblocks;  // Number of data blocks
@@ -66,6 +66,7 @@ xint(uint x)
 
 int checkBadInode();
 int checkBadAddressInInode();
+int checkRootDir();
 
 int main(int argc, char *argv[]){
   uchar buf[BSIZE];
@@ -79,11 +80,30 @@ int main(int argc, char *argv[]){
   rsect(1, buf);
   memmove(&sb, buf, sizeof(sb));
 
+  printf("%d %d %d %d %x %x %x\n", sb.size, sb.nblocks, sb.ninodes, sb.nlog, sb.logstart, sb.inodestart, sb.bmapstart);
+
+  nbitmap = sb.size / (BSIZE*8) + 1;
+  ninodeblocks =  sb.ninodes / IPB + 1;
+  nlog = sb.nlog;
   nmeta = 2 + nlog + ninodeblocks + nbitmap;
   nblocks = sb.size - nmeta;
 
   checkBadInode();
+  checkBadAddressInInode();
+  checkRootDir();
 
+}
+
+int checkRootDir(){
+  struct dinode dInode;
+  rinode(1, &dInode);
+  if(dInode.type != T_DIR){
+    printf("%d\n", dInode.type);
+    printf("ERROR MESSAGE: root directory does not exist.\n");
+    close(fsfd);
+    exit(1);
+  }
+  return 0;
 }
 
 int checkBadInode(){
@@ -92,6 +112,7 @@ int checkBadInode(){
   for(inode = 0; inode < sb.ninodes; inode++) {
     struct dinode dInode;
     rinode(inode, &dInode);
+    //printf("%d ", dInode.type);
     if (dInode.type != 0 && dInode.type != T_FILE && dInode.type != T_DIR && dInode.type != T_DEV) {
       printf("ERROR: bad inode.\n");
       close(fsfd);
