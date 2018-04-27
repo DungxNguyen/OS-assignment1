@@ -575,13 +575,13 @@ getpinfo(struct pstat * pstatresult){
   acquire(&ptable.lock);
   for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
     if(p -> state == UNUSED){
-      pstatresult[i++]->inuse = 0;
+      pstatresult->inuse[i++] = 0;
       continue;
     }
-    pstatresult[i]->inuse = 1;
-    pstatresult[i]->pid = p->pid;
-    pstatresult[i]->hticks = p->hticks;
-    pstatresult[i++]->lticks = p->lticks;
+    pstatresult->inuse[i] = 1;
+    pstatresult->pid[i] = p->pid;
+    pstatresult->hticks[i] = p->hticks;
+    pstatresult->lticks[i++] = p->lticks;
   }
   release(&ptable.lock);
   return 0;
