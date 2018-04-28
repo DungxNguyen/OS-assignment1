@@ -449,7 +449,7 @@ int checkBadAddressInInode(){//2
     struct dinode dInode;
     rinode(inode, &dInode);
     if (dInode.type != 0) {
-      for(int dBlock = 0; dBlock < NDIRECT; dBlock++) {
+      for(int dBlock = 0; dBlock <= NDIRECT; dBlock++) {
         // no map is okay
         if(dInode.addrs[dBlock] == 0)
           continue;
@@ -484,7 +484,7 @@ int checkUsedInodeBitmap(){ //6
     rinode(inode, &dInode);
     if (dInode.type == 0)
       continue;
-    for(int dBlock = 0; dBlock < NDIRECT; dBlock++) {
+    for(int dBlock = 0; dBlock <= NDIRECT; dBlock++) {
       if (!checkBmap(dInode.addrs[dBlock])){
         printf("ERROR: address used by inode but marked free in bitmap.\n");
         close(fsfd);
@@ -522,7 +522,7 @@ int checkUsedBitmap(){ //7
     rinode(inode, &dInode);
     if (dInode.type == 0)
       continue;
-    for(int dBlock = 0; dBlock < NDIRECT; dBlock++) {
+    for(int dBlock = 0; dBlock <= NDIRECT; dBlock++) {
       //printf("%d\n", dInode.addrs[dBlock] - nmeta);
       if (dInode.addrs[dBlock] == 0)
         continue;
@@ -564,7 +564,7 @@ int checkAddressInUsedOnce(){ //8
     rinode(inode, &dInode);
     if (dInode.type == 0)
       continue;
-    for(int dBlock = 0; dBlock < NDIRECT; dBlock++) {
+    for(int dBlock = 0; dBlock <= NDIRECT; dBlock++) {
       //printf("%d\n", dInode.addrs[dBlock] - nmeta);
       if (dInode.addrs[dBlock] == 0)
         continue;
