@@ -4,6 +4,7 @@
 #include <string.h>
 #include <fcntl.h>
 #include <assert.h>
+#include <time.h>
 
 #define stat xv6_stat  // avoid clash with host struct stat
 #include "types.h"
@@ -81,17 +82,19 @@ int checkDirAppearOnce();//12
 
 int main(int argc, char *argv[]){
   uchar buf[BSIZE];
-  fsfd = open(argv[1], O_RDONLY);
+  fsfd = open(argv[1], O_RDWR);
   if(fsfd < 0){
     perror(argv[1]);
     printf("image not found\n");
     exit(1);
   }
 
+  srand(time(NULL));   // should only be called once
+
   rsect(1, buf);
   memmove(&sb, buf, sizeof(sb));
 
-  printf("%d %d %d %d %x %x %x\n", sb.size, sb.nblocks, sb.ninodes, sb.nlog, sb.logstart, sb.inodestart, sb.bmapstart);
+  //printf("%d %d %d %d %x %x %x\n", sb.size, sb.nblocks, sb.ninodes, sb.nlog, sb.logstart, sb.inodestart, sb.bmapstart);
 
   nbitmap = sb.size / (BSIZE*8) + 1;
   ninodeblocks =  sb.ninodes / IPB + 1;
@@ -99,22 +102,42 @@ int main(int argc, char *argv[]){
   nmeta = 2 + nlog + ninodeblocks + nbitmap;
   nblocks = sb.size - nmeta;
 
-  printf("%d %d %d %d %d\n", nbitmap, ninodeblocks, nlog, nmeta, nblocks);
+  //printf("%d %d %d %d %d\n", nbitmap, ninodeblocks, nlog, nmeta, nblocks);
 
   //printf("\ncheck last bitmap: %d\n", checkBmap(sb.size - 1));
+  if(argc < 2){
+    printf("Please include an error type\n");
+    exit(-1);
+  }
 
-  checkBadInode(); //1
-  checkBadAddressInInode(); //2
-  checkRootDir(); //3
-  checkDirFormat(); //4
-  checkParentDir(); //5
-  checkUsedInodeBitmap();//6
-  checkUsedBitmap(); //7
-  checkAddressInUsedOnce();//8
-  checkInodeInDirectory();//9
-  checkInodeMarkFree();//10
-  checkReferenceCountForFile();//11
-  checkDirAppearOnce();//12
+  printf("-------------------------------Error type: %s\n", argv[2]);
+
+  if(!strcmp(argv[2], "1"))
+    checkBadInode(); //1
+  else if(!strcmp(argv[2], "2"))
+    checkBadAddressInInode(); //2
+  else if(!strcmp(argv[2], "3"))
+    checkRootDir(); //3
+  else if(!strcmp(argv[2], "4"))
+    checkDirFormat(); //4
+  else if(!strcmp(argv[2], "5"))
+    checkParentDir(); //5
+  else if(!strcmp(argv[2], "6"))
+    checkUsedInodeBitmap();//6
+  else if(!strcmp(argv[2], "7"))
+    checkUsedBitmap(); //7
+  else if(!strcmp(argv[2], "8"))
+    checkAddressInUsedOnce();//8
+  else if(!strcmp(argv[2], "9"))
+    checkInodeInDirectory();//9
+  else if(!strcmp(argv[2], "10"))
+    checkInodeMarkFree();//10
+  else if(!strcmp(argv[2], "11"))
+    checkReferenceCountForFile();//11
+  else if(!strcmp(argv[2], "12"))
+    checkDirAppearOnce();//12
+  else
+    printf("Please include an error type");
 
   close(fsfd);
   exit(0);
@@ -280,6 +303,7 @@ int findDir(uint address, char* name){
       continue;
     //printf("%d %s\n", dir.inum, dir.name);
     if (strcmp(name, dir.name) == 0){
+      dir.inum = 0;
       return dir.inum;
     }
   }
@@ -417,62 +441,33 @@ int checkBmap(uint address){
 int checkRootDir(){
   struct dinode dInode;
   rinode(1, &dInode);
-  if(dInode.type != T_DIR){
-    printf("%d\n", dInode.type);
-    printf("root directory does not exist.\n");
-    close(fsfd);
-    exit(1);
-  }
+  dInode.type = T_FILE;
+  winode(1, &dInode);
   return 0;
 }
 
 int checkBadInode(){ //1
   // check Error 1
-  uint inode;
-  for(inode = 0; inode < sb.ninodes; inode++) {
-    struct dinode dInode;
-    rinode(inode, &dInode);
-    //printf("%d ", dInode.type);
-    if (dInode.type != 0 && dInode.type != T_FILE && dInode.type != T_DIR && dInode.type != T_DEV) {
-      printf("bad inode.\n");
-      close(fsfd);
-      exit(1);
-    }
-  }
+  uint inode = rand() % sb.ninodes;
+  struct dinode dInode;
+  rinode(inode, &dInode);
+  dInode.type = -1;
+  winode(inode, &dInode);
   return 0;
 }
 
 int checkBadAddressInInode(){//2
-  uint inode;
-  for(inode = 0; inode < sb.ninodes; inode++) {
-    struct dinode dInode;
-    rinode(inode, &dInode);
-    if (dInode.type != 0) {
-      for(int dBlock = 0; dBlock <= NDIRECT; dBlock++) {
-        // no map is okay
-        if(dInode.addrs[dBlock] == 0)
-          continue;
-        // map to address bigger than maximum or smaller than starting data block
-        if(dInode.addrs[dBlock] >= sb.size || dInode.addrs[dBlock] < nmeta){
-          printf("bad address in inode.\n");
-          close(fsfd);
-          exit(1);
-        }
-      }
-      if(dInode.addrs[NDIRECT] == 0)
-        continue;
-      uchar buf[BSIZE];
-      rsect(dInode.addrs[NDIRECT], buf);
-      uint *indirectPointer = (uint*)buf;
-      for(int indirect = 0; indirect < NINDIRECT; indirect++){
-        if(indirectPointer[indirect]!= 0 && (indirectPointer[indirect] >= sb.size || indirectPointer[indirect] < nmeta)){
-          printf("bad address in inode.\n");
-          close(fsfd);
-          exit(1);
-        }
-      }
-    }
+  // check Error 1
+  uint inode = rand() % sb.ninodes;
+  struct dinode dInode;
+  rinode(inode, &dInode);
+  dInode.type = T_FILE;
+  if (rand()%2){
+    dInode.addrs[0] = sb.size;
+  }else{
+    dInode.addrs[0] = nmeta - 1;
   }
+  winode(inode, &dInode);
   return 0;
 }
 
@@ -630,3 +625,105 @@ rsect(uint sec, void *buf)
   }
 }
 
+void
+wsect(uint sec, void *buf)
+{
+  if(lseek(fsfd, sec * BSIZE, 0) != sec * BSIZE){
+    perror("lseek");
+    exit(1);
+  }
+  if(write(fsfd, buf, BSIZE) != BSIZE){
+    perror("write");
+    exit(1);
+  }
+}
+
+void
+winode(uint inum, struct dinode *ip)
+{
+  char buf[BSIZE];
+  uint bn;
+  struct dinode *dip;
+
+  bn = IBLOCK(inum, sb);
+  rsect(bn, buf);
+  dip = ((struct dinode*)buf) + (inum % IPB);
+  *dip = *ip;
+  wsect(bn, buf);
+}
+
+uint
+ialloc(ushort type)
+{
+  uint inum = freeinode++;
+  struct dinode din;
+
+  bzero(&din, sizeof(din));
+  din.type = xshort(type);
+  din.nlink = xshort(1);
+  din.size = xint(0);
+  winode(inum, &din);
+  return inum;
+}
+
+void
+balloc(int used)
+{
+  uchar buf[BSIZE];
+  int i;
+
+  printf("balloc: first %d blocks have been allocated\n", used);
+  assert(used < BSIZE*8);
+  bzero(buf, BSIZE);
+  for(i = 0; i < used; i++){
+    buf[i/8] = buf[i/8] | (0x1 << (i%8));
+  }
+  printf("balloc: write bitmap block at sector %d\n", sb.bmapstart);
+  wsect(sb.bmapstart, buf);
+}
+
+#define min(a, b) ((a) < (b) ? (a) : (b))
+
+void
+iappend(uint inum, void *xp, int n)
+{
+  char *p = (char*)xp;
+  uint fbn, off, n1;
+  struct dinode din;
+  char buf[BSIZE];
+  uint indirect[NINDIRECT];
+  uint x;
+
+  rinode(inum, &din);
+  off = xint(din.size);
+  // printf("append inum %d at off %d sz %d\n", inum, off, n);
+  while(n > 0){
+    fbn = off / BSIZE;
+    assert(fbn < MAXFILE);
+    if(fbn < NDIRECT){
+      if(xint(din.addrs[fbn]) == 0){
+        din.addrs[fbn] = xint(freeblock++);
+      }
+      x = xint(din.addrs[fbn]);
+    } else {
+      if(xint(din.addrs[NDIRECT]) == 0){
+        din.addrs[NDIRECT] = xint(freeblock++);
+      }
+      rsect(xint(din.addrs[NDIRECT]), (char*)indirect);
+      if(indirect[fbn - NDIRECT] == 0){
+        indirect[fbn - NDIRECT] = xint(freeblock++);
+        wsect(xint(din.addrs[NDIRECT]), (char*)indirect);
+      }
+      x = xint(indirect[fbn-NDIRECT]);
+    }
+    n1 = min(n, (fbn + 1) * BSIZE - off);
+    rsect(x, buf);
+    bcopy(p, buf + off - (fbn * BSIZE), n1);
+    wsect(x, buf);
+    n -= n1;
+    off += n1;
+    p += n1;
+  }
+  din.size = xint(off);
+  winode(inum, &din);
+}

@@ -151,8 +151,17 @@ _forktest: forktest.o $(ULIB)
 
 mkfs: mkfs.c fs.h
 	gcc -Werror -Wall -o mkfs mkfs.c
-fsck: mkfs fscheck.c
+
+fsck: fscheck.c fs.h
 	gcc -Werror -Wall -o fscheck fscheck.c
+
+corruptfs: corruptfs.c fs.h
+	gcc -Werror -Wall -o corruptfs corruptfs.c
+
+corrupttest: corruptfs fs.img fsck
+	cp fs.img fs-test.img
+	./corruptfs fs-test.img $(test) 
+	./fscheck fs-test.img
 
 # Prevent deletion of intermediate files, e.g. cat.o, after first build, so
 # that disk image changes after first build are persistent until clean.  More
