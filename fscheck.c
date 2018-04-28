@@ -107,12 +107,64 @@ int main(int argc, char *argv[]){
   checkBadInode(); //1
   checkBadAddressInInode(); //2
   checkRootDir(); //3
+  checkDirFormat(); //4
   checkUsedInodeBitmap();//6
   checkUsedBitmap(); //7
   checkAddressInUsedOnce();//8
 
   close(fsfd);
   exit(0);
+}
+
+int findDir(uint address, char* name){
+  struct dirent dir;
+  uchar buf[BSIZE];
+  rsect(address, buf);
+  for (int i = 0; i < BSIZE / sizeof(struct dirent); i++) {
+    memmove(&dir, buf + i * sizeof(struct dirent), sizeof(struct dirent));
+    if (dir.inum == 0)
+      continue;
+    //printf("%d %s\n", dir.inum, dir.name);
+    if (strcmp(name, dir.name) == 0){
+      return 1;
+    }
+  }
+  return 0;
+}
+
+int checkDirFormat(){ //4
+  uint inode;
+  for(inode = 0; inode < sb.ninodes; inode++) {
+    struct dinode dInode;
+    rinode(inode, &dInode);
+    if (dInode.type == T_DIR) {
+      for(int dBlock = 0; dBlock <= NDIRECT; dBlock++) {
+        // no map is okay
+        if(dInode.addrs[dBlock] == 0)
+          continue;
+        if(!findDir(dInode.addrs[dBlock], ".") || !findDir(dInode.addrs[dBlock], "..")){
+          printf("directory not properly formatted.\n");
+          close(fsfd);
+          exit(1);
+        }
+      }
+      if(dInode.addrs[NDIRECT] == 0)
+        continue;
+      uchar buf[BSIZE];
+      rsect(dInode.addrs[NDIRECT], buf);
+      uint *indirectPointer = (uint*)buf;
+      for(int indirect = 0; indirect < NINDIRECT; indirect++){
+        if(indirectPointer[indirect]== 0)
+          continue;
+        if(!findDir(indirectPointer[indirect], ".") || !findDir(indirectPointer[indirect], "..")){
+          printf("directory not properly formatted.\n");
+          close(fsfd);
+          exit(1);
+        }
+      }
+    }
+  }
+  return 0;
 }
 
 int checkBmap(uint address){
@@ -153,7 +205,7 @@ int checkBadInode(){ //1
   return 0;
 }
 
-int checkBadAddressInInode(){
+int checkBadAddressInInode(){//2
   uint inode;
   for(inode = 0; inode < sb.ninodes; inode++) {
     struct dinode dInode;
