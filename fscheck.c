@@ -112,9 +112,137 @@ int main(int argc, char *argv[]){
   checkUsedInodeBitmap();//6
   checkUsedBitmap(); //7
   checkAddressInUsedOnce();//8
+  checkInodeInDirectory();//9
+  checkInodeMarkFree();//10
+
+  checkDirAppearOnce();//12
 
   close(fsfd);
   exit(0);
+}
+
+void checkInodeInDirectoryRecursive(struct dinode dir, int *inodeRealUse){
+  if (dir.type != T_DIR) 
+    return;
+
+  for(int dBlock = 0; dBlock <= NDIRECT; dBlock++) {
+    if(dir.addrs[dBlock] == 0)
+      continue;
+    struct dirent dirEntry;
+    uchar buf[BSIZE];
+    rsect(dir.addrs[dBlock], buf);
+    for (int i = 0; i < BSIZE / sizeof(struct dirent); i++) {
+      memmove(&dirEntry, buf + i * sizeof(struct dirent), sizeof(struct dirent));
+      if (dirEntry.inum == 0 || !strcmp(dirEntry.name, ".") || !strcmp(dirEntry.name, ".."))
+        continue;
+      inodeRealUse[dirEntry.inum] += 1;
+      struct dinode childDir;
+      rinode(dirEntry.inum, &childDir);
+      checkInodeInDirectoryRecursive(childDir, inodeRealUse);
+    }
+  }
+
+  if(dir.addrs[NDIRECT] == 0)
+    return;
+
+  uchar buf[BSIZE];
+  rsect(dir.addrs[NDIRECT], buf);
+  uint *indirectPointer = (uint*)buf;
+  for(int indirect = 0; indirect < NINDIRECT; indirect++){
+    if(indirectPointer[indirect] == 0)
+      continue;
+    struct dirent dirEntry;
+    uchar buf[BSIZE];
+    rsect(indirectPointer[indirect], buf);
+    for (int i = 0; i < BSIZE / sizeof(struct dirent); i++) {
+      memmove(&dirEntry, buf + i * sizeof(struct dirent), sizeof(struct dirent));
+      if (dirEntry.inum == 0 || !strcmp(dirEntry.name, ".") || !strcmp(dirEntry.name, ".."))
+        continue;
+      inodeRealUse[dirEntry.inum] += 1;
+      struct dinode childDir;
+      rinode(dirEntry.inum, &childDir);
+      checkInodeInDirectoryRecursive(childDir, inodeRealUse);
+    }
+  }
+
+}
+
+int checkDirAppearOnce(){//12
+  struct dinode root;
+  rinode(1, &root);
+  int inodeRealUse[sb.ninodes];
+  for(int i = 0; i < sb.ninodes; i++){
+    inodeRealUse[i] = 0;
+  }
+  inodeRealUse[1] = 1;
+
+  checkInodeInDirectoryRecursive(root, inodeRealUse);
+
+  for(uint inode = 0; inode < sb.ninodes; inode++) {
+    struct dinode dInode;
+    rinode(inode, &dInode);
+    //printf("%d ", dInode.type);
+    if (dInode.type == T_DIR && inodeRealUse[(int) inode] > 1) {
+      printf("%d\n", inode);
+      printf("directory appears more than once in file system.\n");
+      close(fsfd);
+      exit(1);
+    }
+  }
+  
+  return 0;
+}
+
+int checkInodeMarkFree(){//10
+  struct dinode root;
+  rinode(1, &root);
+  int inodeRealUse[sb.ninodes];
+  for(int i = 0; i < sb.ninodes; i++){
+    inodeRealUse[i] = 0;
+  }
+  inodeRealUse[1] = 1;
+
+  checkInodeInDirectoryRecursive(root, inodeRealUse);
+
+  for(uint inode = 0; inode < sb.ninodes; inode++) {
+    struct dinode dInode;
+    rinode(inode, &dInode);
+    //printf("%d ", dInode.type);
+    if (dInode.type == 0 && inodeRealUse[(int) inode]) {
+      printf("%d\n", inode);
+      printf("inode referred to in directory but marked free.\n");
+      close(fsfd);
+      exit(1);
+    }
+  }
+  
+  return 0;
+}
+
+int checkInodeInDirectory(){//9
+  struct dinode root;
+  rinode(1, &root);
+  int inodeRealUse[sb.ninodes];
+  for(int i = 0; i < sb.ninodes; i++){
+    inodeRealUse[i] = 0;
+  }
+  inodeRealUse[1] = 1;
+
+  checkInodeInDirectoryRecursive(root, inodeRealUse);
+
+  for(uint inode = 0; inode < sb.ninodes; inode++) {
+    struct dinode dInode;
+    rinode(inode, &dInode);
+    //printf("%d ", dInode.type);
+    if (dInode.type != 0 && !inodeRealUse[(int) inode]) {
+      printf("%d\n", inode);
+      printf("inode marked use but not found in a directory.\n");
+      close(fsfd);
+      exit(1);
+    }
+  }
+  
+  return 0;
 }
 
 int findDir(uint address, char* name){
@@ -132,7 +260,6 @@ int findDir(uint address, char* name){
   }
   return 0;
 }
-
 
 int findDirByInum(uint address, ushort inum){
   struct dirent dir;
@@ -452,34 +579,6 @@ int checkAddressInUsedOnce(){ //8
   return 0;
 }
 
-
-void
-wsect(uint sec, void *buf)
-{
-  if(lseek(fsfd, sec * BSIZE, 0) != sec * BSIZE){
-    perror("lseek");
-    exit(1);
-  }
-  if(write(fsfd, buf, BSIZE) != BSIZE){
-    perror("write");
-    exit(1);
-  }
-}
-
-void
-winode(uint inum, struct dinode *ip)
-{
-  char buf[BSIZE];
-  uint bn;
-  struct dinode *dip;
-
-  bn = IBLOCK(inum, sb);
-  rsect(bn, buf);
-  dip = ((struct dinode*)buf) + (inum % IPB);
-  *dip = *ip;
-  wsect(bn, buf);
-}
-
 void
 rinode(uint inum, struct dinode *ip)
 {
@@ -506,78 +605,3 @@ rsect(uint sec, void *buf)
   }
 }
 
-uint
-ialloc(ushort type)
-{
-  uint inum = freeinode++;
-  struct dinode din;
-
-  bzero(&din, sizeof(din));
-  din.type = xshort(type);
-  din.nlink = xshort(1);
-  din.size = xint(0);
-  winode(inum, &din);
-  return inum;
-}
-
-void
-balloc(int used)
-{
-  uchar buf[BSIZE];
-  int i;
-
-  printf("balloc: first %d blocks have been allocated\n", used);
-  assert(used < BSIZE*8);
-  bzero(buf, BSIZE);
-  for(i = 0; i < used; i++){
-    buf[i/8] = buf[i/8] | (0x1 << (i%8));
-  }
-  printf("balloc: write bitmap block at sector %d\n", sb.bmapstart);
-  wsect(sb.bmapstart, buf);
-}
-
-#define min(a, b) ((a) < (b) ? (a) : (b))
-
-void
-iappend(uint inum, void *xp, int n)
-{
-  char *p = (char*)xp;
-  uint fbn, off, n1;
-  struct dinode din;
-  char buf[BSIZE];
-  uint indirect[NINDIRECT];
-  uint x;
-
-  rinode(inum, &din);
-  off = xint(din.size);
-  // printf("append inum %d at off %d sz %d\n", inum, off, n);
-  while(n > 0){
-    fbn = off / BSIZE;
-    assert(fbn < MAXFILE);
-    if(fbn < NDIRECT){
-      if(xint(din.addrs[fbn]) == 0){
-        din.addrs[fbn] = xint(freeblock++);
-      }
-      x = xint(din.addrs[fbn]);
-    } else {
-      if(xint(din.addrs[NDIRECT]) == 0){
-        din.addrs[NDIRECT] = xint(freeblock++);
-      }
-      rsect(xint(din.addrs[NDIRECT]), (char*)indirect);
-      if(indirect[fbn - NDIRECT] == 0){
-        indirect[fbn - NDIRECT] = xint(freeblock++);
-        wsect(xint(din.addrs[NDIRECT]), (char*)indirect);
-      }
-      x = xint(indirect[fbn-NDIRECT]);
-    }
-    n1 = min(n, (fbn + 1) * BSIZE - off);
-    rsect(x, buf);
-    bcopy(p, buf + off - (fbn * BSIZE), n1);
-    wsect(x, buf);
-    n -= n1;
-    off += n1;
-    p += n1;
-  }
-  din.size = xint(off);
-  winode(inum, &din);
-}
