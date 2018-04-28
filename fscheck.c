@@ -109,6 +109,7 @@ int main(int argc, char *argv[]){
   checkRootDir(); //3
   checkUsedInodeBitmap();//6
   checkUsedBitmap(); //7
+  checkAddressInUsedOnce();//8
 
   close(fsfd);
   exit(0);
@@ -124,80 +125,6 @@ int checkBmap(uint address){
   return ((buf[address % (8 * BSIZE) / 8] >> (address % 8)) % 2);
 }
 
-
-int checkUsedBitmap(){ //7
-  uint inode;
-  int inUsedBlock[nblocks];
-  for(int i = 0; i < nblocks; i++){
-    inUsedBlock[i] = 0;
-    //printf("%d %d\n", i, checkBmap(i + nmeta));
-  }
-
-  for(inode = 0; inode < sb.ninodes; inode++) {
-    struct dinode dInode;
-    rinode(inode, &dInode);
-    if (dInode.type == 0)
-      continue;
-    for(int dBlock = 0; dBlock <= NDIRECT; dBlock++) {
-      //printf("%d\n", dInode.addrs[dBlock] - nmeta);
-      if (dInode.addrs[dBlock] == 0)
-        continue;
-      inUsedBlock[dInode.addrs[dBlock] - nmeta] = 1;
-    }
-    
-    if(dInode.addrs[NDIRECT] == 0)
-      continue;
-    uchar buf[BSIZE];
-    rsect(dInode.addrs[NDIRECT], buf);
-    uint *indirectPointer = (uint*)buf;
-    for(int indirect = 0; indirect < NINDIRECT; indirect++){
-      if(indirectPointer[indirect] == 0)
-        continue;
-      inUsedBlock[indirectPointer[indirect] - nmeta] = 1;
-    }
-  }
-  for(int i = 0; i < nblocks; i++){
-    //printf("%d %d %d\n", i, inUsedBlock[i], checkBmap(i + nmeta));
-    if(checkBmap(i + nmeta) != inUsedBlock[i]){
-      printf("ERROR: bitmap marks block in use but it is not in use.\n");
-      close(fsfd);
-      exit(1);
-    }
-  }
-  return 0;
-}
-
-int checkUsedInodeBitmap(){
-  uint inode;
-  for(inode = 0; inode < sb.ninodes; inode++) {
-    struct dinode dInode;
-    rinode(inode, &dInode);
-    if (dInode.type == 0)
-      continue;
-    for(int dBlock = 0; dBlock <= NDIRECT; dBlock++) {
-      if (!checkBmap(dInode.addrs[dBlock])){
-        printf("ERROR: address used by inode but marked free in bitmap.\n");
-        close(fsfd);
-        exit(1);
-      }
-    }
-    
-    if(dInode.addrs[NDIRECT] == 0)
-      continue;
-    uchar buf[BSIZE];
-    rsect(dInode.addrs[NDIRECT], buf);
-    uint *indirectPointer = (uint*)buf;
-    for(int indirect = 0; indirect < NINDIRECT; indirect++){
-      if(!checkBmap(indirectPointer[indirect])){
-        printf("%d %d \n", indirectPointer[indirect], checkBmap(indirectPointer[indirect]));
-        printf("ERROR: address used by inode but marked free in bitmap.\n");
-        close(fsfd);
-        exit(1);
-      }
-    }
-  }
-  return 0;
-}
 int checkRootDir(){
   struct dinode dInode;
   rinode(1, &dInode);
@@ -210,7 +137,7 @@ int checkRootDir(){
   return 0;
 }
 
-int checkBadInode(){
+int checkBadInode(){ //1
   // check Error 1
   uint inode;
   for(inode = 0; inode < sb.ninodes; inode++) {
@@ -259,6 +186,135 @@ int checkBadAddressInInode(){
   }
   return 0;
 }
+
+int checkUsedInodeBitmap(){ //6
+  uint inode;
+  for(inode = 0; inode < sb.ninodes; inode++) {
+    struct dinode dInode;
+    rinode(inode, &dInode);
+    if (dInode.type == 0)
+      continue;
+    for(int dBlock = 0; dBlock <= NDIRECT; dBlock++) {
+      if (!checkBmap(dInode.addrs[dBlock])){
+        printf("ERROR: address used by inode but marked free in bitmap.\n");
+        close(fsfd);
+        exit(1);
+      }
+    }
+    
+    if(dInode.addrs[NDIRECT] == 0)
+      continue;
+    uchar buf[BSIZE];
+    rsect(dInode.addrs[NDIRECT], buf);
+    uint *indirectPointer = (uint*)buf;
+    for(int indirect = 0; indirect < NINDIRECT; indirect++){
+      if(!checkBmap(indirectPointer[indirect])){
+        printf("%d %d \n", indirectPointer[indirect], checkBmap(indirectPointer[indirect]));
+        printf("ERROR: address used by inode but marked free in bitmap.\n");
+        close(fsfd);
+        exit(1);
+      }
+    }
+  }
+  return 0;
+}
+
+int checkUsedBitmap(){ //7
+  uint inode;
+  int inUsedBlock[nblocks];
+  for(int i = 0; i < nblocks; i++){
+    inUsedBlock[i] = 0;
+    //printf("%d %d\n", i, checkBmap(i + nmeta));
+  }
+
+  for(inode = 0; inode < sb.ninodes; inode++) {
+    struct dinode dInode;
+    rinode(inode, &dInode);
+    if (dInode.type == 0)
+      continue;
+    for(int dBlock = 0; dBlock <= NDIRECT; dBlock++) {
+      //printf("%d\n", dInode.addrs[dBlock] - nmeta);
+      if (dInode.addrs[dBlock] == 0)
+        continue;
+      inUsedBlock[dInode.addrs[dBlock] - nmeta] = 1;
+    }
+    
+    if(dInode.addrs[NDIRECT] == 0)
+      continue;
+    uchar buf[BSIZE];
+    rsect(dInode.addrs[NDIRECT], buf);
+    uint *indirectPointer = (uint*)buf;
+    for(int indirect = 0; indirect < NINDIRECT; indirect++){
+      if(indirectPointer[indirect] == 0)
+        continue;
+      inUsedBlock[indirectPointer[indirect] - nmeta] = 1;
+    }
+  }
+  for(int i = 0; i < nblocks; i++){
+    //printf("%d %d %d\n", i, inUsedBlock[i], checkBmap(i + nmeta));
+    if(checkBmap(i + nmeta) != inUsedBlock[i]){
+      printf("ERROR: bitmap marks block in use but it is not in use.\n");
+      close(fsfd);
+      exit(1);
+    }
+  }
+  return 0;
+}
+
+int checkAddressInUsedOnce(){ //8
+  uint inode;
+  int inUsedBlock[nblocks];
+  for(int i = 0; i < nblocks; i++){
+    inUsedBlock[i] = 0;
+    //printf("%d %d\n", i, checkBmap(i + nmeta));
+  }
+
+  for(inode = 0; inode < sb.ninodes; inode++) {
+    struct dinode dInode;
+    rinode(inode, &dInode);
+    if (dInode.type == 0)
+      continue;
+    for(int dBlock = 0; dBlock <= NDIRECT; dBlock++) {
+      //printf("%d\n", dInode.addrs[dBlock] - nmeta);
+      if (dInode.addrs[dBlock] == 0)
+        continue;
+      if(inUsedBlock[dInode.addrs[dBlock] - nmeta] == 1){
+        printf("ERROR: address used more than once.\n");
+        close(fsfd);
+        exit(1);
+      }else{
+        inUsedBlock[dInode.addrs[dBlock] - nmeta] = 1;
+      }
+    }
+    
+    if(dInode.addrs[NDIRECT] == 0)
+      continue;
+    uchar buf[BSIZE];
+    rsect(dInode.addrs[NDIRECT], buf);
+    uint *indirectPointer = (uint*)buf;
+    for(int indirect = 0; indirect < NINDIRECT; indirect++){
+      if(indirectPointer[indirect] == 0)
+        continue;
+      if(inUsedBlock[indirectPointer[indirect] - nmeta] == 1){
+        printf("ERROR: address used more than once.\n");
+        close(fsfd);
+        exit(1);
+      }else{
+        inUsedBlock[indirectPointer[indirect] - nmeta] = 1;
+      }
+    }
+  }
+  for(int i = 0; i < nblocks; i++){
+    //printf("%d %d %d\n", i, inUsedBlock[i], checkBmap(i + nmeta));
+    if(checkBmap(i + nmeta) != inUsedBlock[i]){
+      printf("ERROR: bitmap marks block in use but it is not in use.\n");
+      close(fsfd);
+      exit(1);
+    }
+  }
+  return 0;
+}
+
 
 void
 wsect(uint sec, void *buf)
