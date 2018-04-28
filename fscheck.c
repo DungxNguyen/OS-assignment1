@@ -108,6 +108,7 @@ int main(int argc, char *argv[]){
   checkBadAddressInInode(); //2
   checkRootDir(); //3
   checkDirFormat(); //4
+  checkParentDir(); //5
   checkUsedInodeBitmap();//6
   checkUsedBitmap(); //7
   checkAddressInUsedOnce();//8
@@ -126,7 +127,91 @@ int findDir(uint address, char* name){
       continue;
     //printf("%d %s\n", dir.inum, dir.name);
     if (strcmp(name, dir.name) == 0){
+      return dir.inum;
+    }
+  }
+  return 0;
+}
+
+
+int findDirByInum(uint address, ushort inum){
+  struct dirent dir;
+  uchar buf[BSIZE];
+  rsect(address, buf);
+  for (int i = 0; i < BSIZE / sizeof(struct dirent); i++) {
+    memmove(&dir, buf + i * sizeof(struct dirent), sizeof(struct dirent));
+    if (dir.inum == 0)
+      continue;
+    //printf("%d %s\n", dir.inum, dir.name);
+    if (dir.inum == inum){
       return 1;
+    }
+  }
+  return 0;
+}
+
+int checkParentDirAtAddress(uint address){
+  int curDirInode = findDir(address, "."); 
+  int parentDirInode = findDir(address, "..");
+  struct dinode parentDir;
+
+  rinode(parentDirInode, &parentDir);
+  if (parentDir.type != T_DIR) 
+    return 0;
+
+  for(int dBlock = 0; dBlock <= NDIRECT; dBlock++) {
+    if(parentDir.addrs[dBlock] == 0)
+      continue;
+    if(findDirByInum(parentDir.addrs[dBlock], curDirInode))
+      return 1;
+  }
+
+  if(parentDir.addrs[NDIRECT] == 0)
+    return 0;
+
+  uchar buf[BSIZE];
+  rsect(parentDir.addrs[NDIRECT], buf);
+  uint *indirectPointer = (uint*)buf;
+  for(int indirect = 0; indirect < NINDIRECT; indirect++){
+    if(indirectPointer[indirect] == 0)
+      continue;
+    if(findDirByInum(indirectPointer[indirect], curDirInode))
+      return 1;
+  }
+
+  return 0;
+}
+
+int checkParentDir(){ //5
+  uint inode;
+  for(inode = 0; inode < sb.ninodes; inode++) {
+    struct dinode dInode;
+    rinode(inode, &dInode);
+    if (dInode.type == T_DIR) {
+      for(int dBlock = 0; dBlock <= NDIRECT; dBlock++) {
+        // no map is okay
+        if(dInode.addrs[dBlock] == 0)
+          continue;
+        if(!checkParentDirAtAddress(dInode.addrs[dBlock])){
+          printf("parent directory mismatch.\n");
+          close(fsfd);
+          exit(1);
+        }
+      }
+      if(dInode.addrs[NDIRECT] == 0)
+        continue;
+      uchar buf[BSIZE];
+      rsect(dInode.addrs[NDIRECT], buf);
+      uint *indirectPointer = (uint*)buf;
+      for(int indirect = 0; indirect < NINDIRECT; indirect++){
+        if(indirectPointer[indirect]== 0)
+          continue;
+        if(!checkParentDirAtAddress(indirectPointer[indirect])){
+          printf("parent directory mismatch.\n");
+          close(fsfd);
+          exit(1);
+        }
+      }
     }
   }
   return 0;
