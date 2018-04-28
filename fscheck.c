@@ -125,7 +125,7 @@ void checkInodeInDirectoryRecursive(struct dinode dir, int *inodeRealUse){
   if (dir.type != T_DIR) 
     return;
 
-  for(int dBlock = 0; dBlock <= NDIRECT; dBlock++) {
+  for(int dBlock = 0; dBlock < NDIRECT; dBlock++) {
     if(dir.addrs[dBlock] == 0)
       continue;
     struct dirent dirEntry;
@@ -312,7 +312,7 @@ int checkParentDirAtAddress(uint address){
   if (parentDir.type != T_DIR) 
     return 0;
 
-  for(int dBlock = 0; dBlock <= NDIRECT; dBlock++) {
+  for(int dBlock = 0; dBlock < NDIRECT; dBlock++) {
     if(parentDir.addrs[dBlock] == 0)
       continue;
     if(findDirByInum(parentDir.addrs[dBlock], curDirInode))
@@ -341,7 +341,7 @@ int checkParentDir(){ //5
     struct dinode dInode;
     rinode(inode, &dInode);
     if (dInode.type == T_DIR) {
-      for(int dBlock = 0; dBlock <= NDIRECT; dBlock++) {
+      for(int dBlock = 0; dBlock < NDIRECT; dBlock++) {
         // no map is okay
         if(dInode.addrs[dBlock] == 0)
           continue;
@@ -376,7 +376,7 @@ int checkDirFormat(){ //4
     struct dinode dInode;
     rinode(inode, &dInode);
     if (dInode.type == T_DIR) {
-      for(int dBlock = 0; dBlock <= NDIRECT; dBlock++) {
+      for(int dBlock = 0; dBlock < NDIRECT; dBlock++) {
         // no map is okay
         if(dInode.addrs[dBlock] == 0)
           continue;
@@ -449,7 +449,7 @@ int checkBadAddressInInode(){//2
     struct dinode dInode;
     rinode(inode, &dInode);
     if (dInode.type != 0) {
-      for(int dBlock = 0; dBlock <= NDIRECT; dBlock++) {
+      for(int dBlock = 0; dBlock < NDIRECT; dBlock++) {
         // no map is okay
         if(dInode.addrs[dBlock] == 0)
           continue;
@@ -484,7 +484,7 @@ int checkUsedInodeBitmap(){ //6
     rinode(inode, &dInode);
     if (dInode.type == 0)
       continue;
-    for(int dBlock = 0; dBlock <= NDIRECT; dBlock++) {
+    for(int dBlock = 0; dBlock < NDIRECT; dBlock++) {
       if (!checkBmap(dInode.addrs[dBlock])){
         printf("ERROR: address used by inode but marked free in bitmap.\n");
         close(fsfd);
@@ -522,7 +522,7 @@ int checkUsedBitmap(){ //7
     rinode(inode, &dInode);
     if (dInode.type == 0)
       continue;
-    for(int dBlock = 0; dBlock <= NDIRECT; dBlock++) {
+    for(int dBlock = 0; dBlock < NDIRECT; dBlock++) {
       //printf("%d\n", dInode.addrs[dBlock] - nmeta);
       if (dInode.addrs[dBlock] == 0)
         continue;
@@ -564,7 +564,7 @@ int checkAddressInUsedOnce(){ //8
     rinode(inode, &dInode);
     if (dInode.type == 0)
       continue;
-    for(int dBlock = 0; dBlock <= NDIRECT; dBlock++) {
+    for(int dBlock = 0; dBlock < NDIRECT; dBlock++) {
       //printf("%d\n", dInode.addrs[dBlock] - nmeta);
       if (dInode.addrs[dBlock] == 0)
         continue;
