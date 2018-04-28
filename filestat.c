@@ -14,7 +14,13 @@ int main(int argc, char *argv[]){
 
   fstat(file, filestat);
 
-  printf(1, "%d %x %x %d %d %d\n", filestat->type, filestat->size, filestat->ino, filestat->nlink, filestat->dev, filestat->checksum);
+  printf(1, "Type: %d\nSize: %x\nInode: %x\nNlink: %d\nDev: %d\nChecksum: %d\n",
+         filestat->type,
+         filestat->size,
+         filestat->ino,
+         filestat->nlink,
+         filestat->dev,
+         filestat->checksum);
 
   exit();
 }

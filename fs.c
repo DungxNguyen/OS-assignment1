@@ -564,6 +564,7 @@ readi(struct inode *ip, char *dst, uint off, uint n)
     bp = bread(ip->dev, bmap(ip, off/BSIZE));
     if(ip->type == T_CHECKED){
       if(checksumBlock(bp) != getChecksum(ip, off/BSIZE)){
+        brelse(bp);
         return -1;
       } 
     }

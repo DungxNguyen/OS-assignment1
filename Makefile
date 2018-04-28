@@ -152,6 +152,15 @@ _forktest: forktest.o $(ULIB)
 mkfs: mkfs.c fs.h
 	gcc -Werror -Wall -o mkfs mkfs.c
 
+corruptcs: corruptcs.c fs.h
+	gcc -Werror -Wall -o corruptcs corruptcs.c
+corrupt: corruptcs
+	./corruptcs fs.img
+corrupttest: corruptcs fs2.img xv6-clone.img
+	$(QEMU) -nographic -drive file=fs2.img,index=1,media=disk,format=raw -drive file=xv6-clone.img,index=0,media=disk,format=raw -smp $(CPUS) -m 512 $(QEMUEXTRA)
+
+
+
 # Prevent deletion of intermediate files, e.g. cat.o, after first build, so
 # that disk image changes after first build are persistent until clean.  More
 # details:
@@ -176,6 +185,9 @@ UPROGS=\
 	_zombie\
 	_filestat\
 	_testcs\
+	_testcs2\
+	_testcs3\
+	_testcs4\
 
 fs.img: mkfs README $(UPROGS)
 	./mkfs fs.img README $(UPROGS)
@@ -185,7 +197,7 @@ fs.img: mkfs README $(UPROGS)
 clean: 
 	rm -f *.tex *.dvi *.idx *.aux *.log *.ind *.ilg \
 	*.o *.d *.asm *.sym vectors.S bootblock entryother \
-	initcode initcode.out kernel xv6.img fs.img kernelmemfs mkfs \
+	initcode initcode.out kernel xv6.img fs.img kernelmemfs mkfs corruptcs \
 	.gdbinit \
 	$(UPROGS)
 
@@ -246,7 +258,7 @@ EXTRA=\
 	mkfs.c ulib.c user.h cat.c echo.c forktest.c grep.c kill.c\
 	ln.c ls.c mkdir.c rm.c stressfs.c usertests.c wc.c zombie.c\
 	printf.c umalloc.c\
-	filestat.c testcs.c\
+	filestat.c testcs.c testcs2.c testcs3.c testcs4.c\
 	README dot-bochsrc *.pl toc.* runoff runoff1 runoff.list\
 	.gdbinit.tmpl gdbutil\
 
