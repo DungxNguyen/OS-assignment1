@@ -445,6 +445,18 @@ stati(struct inode *ip, struct stat *st)
   st->type = ip->type;
   st->nlink = ip->nlink;
   st->size = ip->size;
+  if(ip->type == T_CHECKED)
+    st->checksum = checksumInode(ip);
+}
+
+uchar
+checksumInode(struct inode *ip){
+  for(int i = 0; i < NDIRECT; i++){
+  }
+}
+
+uchar
+checksumBlock(uint address){
 }
 
 //PAGEBREAK!
