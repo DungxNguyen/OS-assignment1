@@ -64,6 +64,8 @@ xint(uint x)
   return y;
 }
 
+int checkBmap(uint address);
+
 int checkBadInode(); //1
 int checkBadAddressInInode(); //2
 int checkRootDir(); //3
@@ -72,6 +74,10 @@ int checkParentDir(); //5
 int checkUsedInodeBitmap(); //6
 int checkUsedBitmap(); //7
 int checkAddressInUsedOnce(); //8
+int checkInodeInDirectory();//9
+int checkInodeMarkFree();//10
+int checkReferenceCountForFile();//11
+int checkDirAppearOnce();//12
 
 
 int main(int argc, char *argv[]){
@@ -97,9 +103,47 @@ int main(int argc, char *argv[]){
   checkBadInode(); //1
   checkBadAddressInInode(); //2
   checkRootDir(); //3
+  checkUsedInodeBitmap();//6
 
   close(fsfd);
   exit(0);
+}
+
+int checkBmap(uint address){
+  uchar buf[BSIZE];
+  rsect(address/(8 * BSIZE) + sb.bmapstart, buf);
+  return ((buf[address / BSIZE] >> (address % 8) % 2));
+}
+
+int checkUsedInodeBitmap(){
+  uint inode;
+  for(inode = 0; inode < sb.ninodes; inode++) {
+    struct dinode dInode;
+    rinode(inode, &dInode);
+    if (dInode.type == 0)
+      continue;
+    for(int dBlock = 0; dBlock <= NDIRECT; dBlock++) {
+      if (!checkBmap(dInode.addrs[dBlock])){
+        printf("ERROR: address used by inode but marked free in bitmap.\n");
+        close(fsfd);
+        exit(1);
+      }
+    }
+
+    if(dInode.addrs[NDIRECT] == 0)
+      continue;
+    uchar buf[BSIZE];
+    rsect(dInode.addrs[NDIRECT], buf);
+    uint *indirectPointer = (uint*)buf;
+    for(int indirect = 0; indirect < NINDIRECT; indirect++){
+      if(!checkBmap(indirectPointer[indirect])){
+      printf("ERROR: address used by inode but marked free in bitmap.\n");
+      close(fsfd);
+      exit(1);
+    }
+  }
+}
+return 0;
 }
 
 int checkRootDir(){
