@@ -377,9 +377,15 @@ bmap(struct inode *ip, uint bn)
   struct buf *bp;
 
   if(bn < NDIRECT){
-    if((addr = ip->addrs[bn]) == 0)
+    if((addr = ip->addrs[bn]) == 0){
       ip->addrs[bn] = addr = balloc(ip->dev);
-    return addr;
+      if(ip->type == T_CHECKED){
+        if((ip->addrs[bn] >> 24) != 0){
+          panic("no blocks for checked file");
+        }
+      }
+    }
+    return (addr & 0x00ffffff);
   }
   bn -= NDIRECT;
 
@@ -391,10 +397,15 @@ bmap(struct inode *ip, uint bn)
     a = (uint*)bp->data;
     if((addr = a[bn]) == 0){
       a[bn] = addr = balloc(ip->dev);
+      if(ip->type == T_CHECKED){
+        if((a[bn] >> 24) != 0){
+          panic("no blocks for checked file");
+        }
+      }
       log_write(bp);
     }
     brelse(bp);
-    return addr;
+    return (addr & 0x00ffffff);
   }
 
   panic("bmap: out of range");
@@ -449,16 +460,86 @@ stati(struct inode *ip, struct stat *st)
     st->checksum = checksumInode(ip);
 }
 
+//TODO: May rewrite using getChecksum
 uchar
 checksumInode(struct inode *ip){
+  uchar checksum = 0;
   for(int i = 0; i < NDIRECT; i++){
+    //cprintf("%x \n", ip->addrs[i]);
+    uchar blockChecksum = (uchar) ((ip->addrs[i] & 0xff000000) >> 24);
+    checksum = checksum ^ blockChecksum;
   }
+
+  if(ip->addrs[NINDIRECT] == 0)
+    return checksum;
+
+  struct buf *indirectBlock;
+  indirectBlock = bread(ip->dev, ip->addrs[NDIRECT]);
+  uint *indirectPointer = (uint*)indirectBlock->data;
+  for(int i = 0; i < NINDIRECT; i++){
+    uchar blockChecksum = (uchar) ((indirectPointer[i] & 0xff000000) >> 24);
+    checksum = checksum ^ blockChecksum;
+  }
+
+  brelse(indirectBlock);
+  return checksum;
 }
 
 uchar
-checksumBlock(uint address){
+checksumBlock(struct buf *block){
+  uchar checksum = 0;
+  uchar *data = (uchar*) block->data;
+  for(int i = 0; i < BSIZE; i++){
+    checksum = checksum ^ data[i];
+  }
+  return checksum;
 }
 
+uchar
+getChecksum(struct inode *ip, uint bn){
+  uint addr, *a;
+  struct buf *bp;
+
+  if(bn < NDIRECT){
+    return (uchar) ((ip->addrs[bn] & 0xff000000) >> 24);
+  }
+  bn -= NDIRECT;
+
+  if(bn < NINDIRECT){
+    // Load indirect block, allocating if necessary.
+    if((addr = ip->addrs[NDIRECT]) == 0)
+      return 0;
+    bp = bread(ip->dev, addr);
+    a = (uint*)bp->data;
+    if((addr = a[bn]) == 0){
+      return 0;
+    }
+    brelse(bp);
+    return (uchar) ((addr & 0xff000000) >> 24);
+  }
+  return 0;
+}
+
+void
+setChecksum(struct inode *ip, uint bn, uchar checksum){
+  uint addr, *a;
+  struct buf *bp;
+
+  if(bn < NDIRECT){
+    ip->addrs[bn] = (ip->addrs[bn] & 0x00ffffff) | (checksum << 24);
+  }
+  bn -= NDIRECT;
+
+  if(bn < NINDIRECT){
+    // Load indirect block, allocating if necessary.
+    if((addr = ip->addrs[NDIRECT]) == 0)
+      panic("checksum for an invalid indirect block");
+    bp = bread(ip->dev, addr);
+    a = (uint*)bp->data;
+    a[bn] = (a[bn] & 0x00ffffff) | (checksum << 24);
+    brelse(bp);
+  }
+}
 //PAGEBREAK!
 // Read data from inode.
 // Caller must hold ip->lock.
@@ -481,6 +562,11 @@ readi(struct inode *ip, char *dst, uint off, uint n)
 
   for(tot=0; tot<n; tot+=m, off+=m, dst+=m){
     bp = bread(ip->dev, bmap(ip, off/BSIZE));
+    if(ip->type == T_CHECKED){
+      if(checksumBlock(bp) != getChecksum(ip, off/BSIZE)){
+        return -1;
+      } 
+    }
     m = min(n - tot, BSIZE - off%BSIZE);
     memmove(dst, bp->data + off%BSIZE, m);
     brelse(bp);
@@ -512,6 +598,12 @@ writei(struct inode *ip, char *src, uint off, uint n)
     bp = bread(ip->dev, bmap(ip, off/BSIZE));
     m = min(n - tot, BSIZE - off%BSIZE);
     memmove(bp->data + off%BSIZE, src, m);
+    if(ip->type == T_CHECKED){
+      uchar checksum = checksumBlock(bp);
+      //cprintf("write checksum: %d %d\n", off/BSIZE, checksum);
+      setChecksum(ip, off/BSIZE, checksum);
+      //cprintf("get checksum: %x %d\n", ip->addrs[off/BSIZE], getChecksum(ip, off/BSIZE));
+    }
     log_write(bp);
     brelse(bp);
   }
