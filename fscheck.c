@@ -114,7 +114,7 @@ int main(int argc, char *argv[]){
   checkAddressInUsedOnce();//8
   checkInodeInDirectory();//9
   checkInodeMarkFree();//10
-
+  checkReferenceCountForFile();//11
   checkDirAppearOnce();//12
 
   close(fsfd);
@@ -165,6 +165,32 @@ void checkInodeInDirectoryRecursive(struct dinode dir, int *inodeRealUse){
     }
   }
 
+}
+
+int checkReferenceCountForFile(){//11
+  struct dinode root;
+  rinode(1, &root);
+  int inodeRealUse[sb.ninodes];
+  for(int i = 0; i < sb.ninodes; i++){
+    inodeRealUse[i] = 0;
+  }
+  inodeRealUse[1] = 1;
+
+  checkInodeInDirectoryRecursive(root, inodeRealUse);
+
+  for(uint inode = 0; inode < sb.ninodes; inode++) {
+    struct dinode dInode;
+    rinode(inode, &dInode);
+    //printf("%d ", dInode.type);
+    if (dInode.type == T_FILE && inodeRealUse[(int) inode] != dInode.nlink) {
+      printf("%d\n", inode);
+      printf("bad reference count for file.\n");
+      close(fsfd);
+      exit(1);
+    }
+  }
+  
+  return 0;
 }
 
 int checkDirAppearOnce(){//12
