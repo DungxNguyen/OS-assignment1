@@ -38,6 +38,18 @@ main(int argc, char *argv[])
         printf(0, "Low priority: %d \n", i);
         busywait(5);
       }
+
+      struct pstat p_stat; 
+
+      getpinfo(&p_stat);
+
+      for (int i = 0; i < NPROC; i++){
+        if (p_stat.inuse[i] == 0)
+          continue;
+        printf(0, "ptable:%d pid:%d name:%s high:%d low:%d\n", i,  p_stat.pid[i], p_stat.pname[i],
+               p_stat.hticks[i], p_stat.lticks[i]);
+      }
+      printf(1, "This test demos 2 High Priority processes run parallely and then low Priority\n");
       wait();
     }
     wait();

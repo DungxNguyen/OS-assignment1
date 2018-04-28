@@ -18,9 +18,8 @@ main(int argc, char *argv[])
   if (pid == 0) {
     setpri(2);
     sleep(2);
-    int i = 0;
     int pri = 2;
-    for (i = 0; i < 30; i++){
+    for (int i = 0; i < 30; i++){
       if( pri == 2)
         printf(1, "High priority 1: %d \n", i);
       else
@@ -31,6 +30,18 @@ main(int argc, char *argv[])
         setpri(1);
       }
     }
+
+    struct pstat p_stat; 
+
+    getpinfo(&p_stat);
+
+    for (int i = 0; i < NPROC; i++){
+      if (p_stat.inuse[i] == 0)
+        continue;
+      printf(0, "ptable:%d pid:%d name:%s high:%d low:%d\n", i,  p_stat.pid[i], p_stat.pname[i],
+             p_stat.hticks[i], p_stat.lticks[i]);
+    }
+    printf(1, "There are 2 High Priority processes run parrallely in the beginning. One of them then is set to lower priority and run parallely with the other Lows\n");
   } else{
     int pid2 = fork();
     if (pid2 == 0) {
