@@ -574,6 +574,9 @@ int checkAddressInUsedOnce(){ //8
       }else{
         inUsedBlock[dInode.addrs[dBlock] - nmeta] = 1;
       }
+      if(dInode.addrs[dBlock] == 59){
+        printf("Got 59: %d\n", inode);
+      }
     }
     
     if(dInode.addrs[NDIRECT] == 0)
@@ -593,14 +596,14 @@ int checkAddressInUsedOnce(){ //8
       }
     }
   }
-  for(int i = 0; i < nblocks; i++){
-    //printf("%d %d %d\n", i, inUsedBlock[i], checkBmap(i + nmeta));
-    if(checkBmap(i + nmeta) != inUsedBlock[i]){
-      printf("bitmap marks block in use but it is not in use.\n");
-      close(fsfd);
-      exit(1);
-    }
-  }
+  //for(int i = 0; i < nblocks; i++){
+  //  //printf("%d %d %d\n", i, inUsedBlock[i], checkBmap(i + nmeta));
+  //  if(checkBmap(i + nmeta) != inUsedBlock[i]){
+  //    printf("bitmap marks block in use but it is not in use.\n");
+  //    close(fsfd);
+  //    exit(1);
+  //  }
+  //}
   return 0;
 }
 
