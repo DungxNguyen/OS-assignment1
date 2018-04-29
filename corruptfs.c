@@ -64,6 +64,7 @@ xint(uint x)
   return y;
 }
 
+int findDir(uint address, char* name);
 int checkBmap(uint address);
 
 int checkBadInode(); //1
@@ -142,6 +143,43 @@ int main(int argc, char *argv[]){
   close(fsfd);
   exit(0);
 }
+int checkParentDir(){//5
+  int findChild = 0;
+  for(uint inode = 0; inode < sb.ninodes -1; inode++) {
+    struct dinode dInode;
+    rinode(inode, &dInode);
+    //printf("%d ", dInode.type);
+    if (dInode.type == T_DIR) {
+      for(uint inode2 = inode + 1; inode2 < sb.ninodes; inode2++) {
+        struct dinode dInode2;
+        rinode(inode2, &dInode2);
+        //if(inode2 == 23){
+        //  printf("23 parent %d %d\n", iInode2.addrs[0], findDir(dInode2.addrs[0], ".."));
+        //}
+        if (dInode2.type == T_DIR && findDir(dInode2.addrs[0], "..") ==inode) {
+          findChild = 1;
+          uchar buf[BSIZE];
+          rsect(dInode.addrs[0], buf);
+          struct dirent* dir = (struct dirent *) buf;
+          for(int j = 0; j < BSIZE / sizeof(struct dirent); j++){
+            if (dir[j].inum == inode2){
+              //printf("E12 %d %d \n", inode, inode2);
+              dir[j].inum = 0; 
+              wsect(dInode.addrs[0], buf);
+              return 0;
+            }
+          }
+        }
+      }
+    }
+  }
+  if(!findChild){
+    printf("ERROR When create Error 5: There is only 1 dir, no parent-children relationship\n");
+    exit(1);
+  }
+  
+  return 0;
+}
 
 void checkInodeInDirectoryRecursive(struct dinode dir, int *inodeRealUse){
   if (dir.type != T_DIR) 
@@ -200,15 +238,14 @@ int checkReferenceCountForFile(){//11
 
   checkInodeInDirectoryRecursive(root, inodeRealUse);
 
-  for(uint inode = 0; inode < sb.ninodes; inode++) {
+  for(uint inode = 3; inode < sb.ninodes; inode++) {
     struct dinode dInode;
     rinode(inode, &dInode);
     //printf("%d ", dInode.type);
-    if (dInode.type == T_FILE && inodeRealUse[(int) inode] != dInode.nlink) {
-      printf("%d\n", inode);
-      printf("bad reference count for file.\n");
-      close(fsfd);
-      exit(1);
+    if (dInode.type == T_FILE) {
+      dInode.nlink += 1;
+      winode(inode, &dInode);
+      return 0;
     }
   }
   
@@ -216,25 +253,31 @@ int checkReferenceCountForFile(){//11
 }
 
 int checkDirAppearOnce(){//12
-  struct dinode root;
-  rinode(1, &root);
-  int inodeRealUse[sb.ninodes];
-  for(int i = 0; i < sb.ninodes; i++){
-    inodeRealUse[i] = 0;
-  }
-  inodeRealUse[1] = 1;
-
-  checkInodeInDirectoryRecursive(root, inodeRealUse);
-
-  for(uint inode = 0; inode < sb.ninodes; inode++) {
+  for(uint inode = 0; inode < sb.ninodes -1; inode++) {
     struct dinode dInode;
     rinode(inode, &dInode);
     //printf("%d ", dInode.type);
-    if (dInode.type == T_DIR && inodeRealUse[(int) inode] > 1) {
-      printf("%d\n", inode);
-      printf("directory appears more than once in file system.\n");
-      close(fsfd);
-      exit(1);
+    if (dInode.type == T_DIR) {
+      for(uint inode2 = inode + 1; inode2 < sb.ninodes; inode2++) {
+        struct dinode dInode2;
+        rinode(inode2, &dInode2);
+        //if(inode2 == 23){
+        //  printf("23 parent %d %d\n", iInode2.addrs[0], findDir(dInode2.addrs[0], ".."));
+        //}
+        if (dInode2.type == T_DIR && findDir(dInode2.addrs[0], "..") !=inode) {
+          uchar buf[BSIZE];
+          rsect(dInode2.addrs[0], buf);
+          struct dirent* dir = (struct dirent *) buf;
+          for(int j = 0; j < BSIZE / sizeof(struct dirent); j++){
+            if (dir[j].inum == 0){
+              //printf("E12 %d %d \n", inode, inode2);
+              dir[j].inum = inode; 
+              wsect(dInode2.addrs[0], buf);
+              return 0;
+            }
+          }
+        }
+      }
     }
   }
   
@@ -252,17 +295,28 @@ int checkInodeMarkFree(){//10
 
   checkInodeInDirectoryRecursive(root, inodeRealUse);
 
-  for(uint inode = 0; inode < sb.ninodes; inode++) {
-    struct dinode dInode;
-    rinode(inode, &dInode);
-    //printf("%d ", dInode.type);
-    if (dInode.type == 0 && inodeRealUse[(int) inode]) {
-      printf("%d\n", inode);
-      printf("inode referred to in directory but marked free.\n");
-      close(fsfd);
-      exit(1);
+  for(int i = 5; i < sb.ninodes; i++){
+    if(!inodeRealUse[i]){
+      for(uint inode = 0; inode < sb.ninodes; inode++) {
+        struct dinode dInode;
+        rinode(inode, &dInode);
+        //printf("%d ", dInode.type);
+        if (dInode.type == T_DIR){
+          uchar buf[BSIZE];
+          rsect(dInode.addrs[0], buf);
+          struct dirent* dir = (struct dirent *) buf;
+          for(int j = 0; j < BSIZE / sizeof(struct dirent); j++){
+            if (dir[j].inum == 0){
+              dir[j].inum = i; 
+              wsect(dInode.addrs[0], buf);
+              return 0;
+            }
+          }
+        }
+      }
     }
   }
+        
   
   return 0;
 }
@@ -278,15 +332,13 @@ int checkInodeInDirectory(){//9
 
   checkInodeInDirectoryRecursive(root, inodeRealUse);
 
-  for(uint inode = 0; inode < sb.ninodes; inode++) {
+  for(uint inode = 5; inode < sb.ninodes; inode++) {
     struct dinode dInode;
     rinode(inode, &dInode);
     //printf("%d ", dInode.type);
-    if (dInode.type != 0 && !inodeRealUse[(int) inode]) {
-      printf("%d\n", inode);
-      printf("inode marked use but not found in a directory.\n");
-      close(fsfd);
-      exit(1);
+    if (dInode.type == 0) {
+      dInode.type = 1;
+      winode(inode, &dInode);
     }
   }
   
@@ -303,7 +355,8 @@ int findDir(uint address, char* name){
       continue;
     //printf("%d %s\n", dir.inum, dir.name);
     if (strcmp(name, dir.name) == 0){
-      dir.inum = 0;
+      //For error 12
+      //dir.inum = 0;
       return dir.inum;
     }
   }
@@ -358,40 +411,40 @@ int checkParentDirAtAddress(uint address){
   return 0;
 }
 
-int checkParentDir(){ //5
-  uint inode;
-  for(inode = 0; inode < sb.ninodes; inode++) {
-    struct dinode dInode;
-    rinode(inode, &dInode);
-    if (dInode.type == T_DIR) {
-      for(int dBlock = 0; dBlock < NDIRECT; dBlock++) {
-        // no map is okay
-        if(dInode.addrs[dBlock] == 0)
-          continue;
-        if(!checkParentDirAtAddress(dInode.addrs[dBlock])){
-          printf("parent directory mismatch.\n");
-          close(fsfd);
-          exit(1);
-        }
-      }
-      if(dInode.addrs[NDIRECT] == 0)
-        continue;
-      uchar buf[BSIZE];
-      rsect(dInode.addrs[NDIRECT], buf);
-      uint *indirectPointer = (uint*)buf;
-      for(int indirect = 0; indirect < NINDIRECT; indirect++){
-        if(indirectPointer[indirect]== 0)
-          continue;
-        if(!checkParentDirAtAddress(indirectPointer[indirect])){
-          printf("parent directory mismatch.\n");
-          close(fsfd);
-          exit(1);
-        }
-      }
-    }
-  }
-  return 0;
-}
+//int checkParentDir(){ //5
+//  uint inode;
+//  for(inode = 0; inode < sb.ninodes; inode++) {
+//    struct dinode dInode;
+//    rinode(inode, &dInode);
+//    if (dInode.type == T_DIR) {
+//      for(int dBlock = 0; dBlock < NDIRECT; dBlock++) {
+//        // no map is okay
+//        if(dInode.addrs[dBlock] == 0)
+//          continue;
+//        if(!checkParentDirAtAddress(dInode.addrs[dBlock])){
+//          printf("parent directory mismatch.\n");
+//          close(fsfd);
+//          exit(1);
+//        }
+//      }
+//      if(dInode.addrs[NDIRECT] == 0)
+//        continue;
+//      uchar buf[BSIZE];
+//      rsect(dInode.addrs[NDIRECT], buf);
+//      uint *indirectPointer = (uint*)buf;
+//      for(int indirect = 0; indirect < NINDIRECT; indirect++){
+//        if(indirectPointer[indirect]== 0)
+//          continue;
+//        if(!checkParentDirAtAddress(indirectPointer[indirect])){
+//          printf("parent directory mismatch.\n");
+//          close(fsfd);
+//          exit(1);
+//        }
+//      }
+//    }
+//  }
+//  return 0;
+//}
 
 int checkDirFormat(){ //4
   uint inode;
@@ -403,24 +456,20 @@ int checkDirFormat(){ //4
         // no map is okay
         if(dInode.addrs[dBlock] == 0)
           continue;
-        if(!findDir(dInode.addrs[dBlock], ".") || !findDir(dInode.addrs[dBlock], "..")){
-          printf("directory not properly formatted.\n");
-          close(fsfd);
-          exit(1);
-        }
-      }
-      if(dInode.addrs[NDIRECT] == 0)
-        continue;
-      uchar buf[BSIZE];
-      rsect(dInode.addrs[NDIRECT], buf);
-      uint *indirectPointer = (uint*)buf;
-      for(int indirect = 0; indirect < NINDIRECT; indirect++){
-        if(indirectPointer[indirect]== 0)
-          continue;
-        if(!findDir(indirectPointer[indirect], ".") || !findDir(indirectPointer[indirect], "..")){
-          printf("directory not properly formatted.\n");
-          close(fsfd);
-          exit(1);
+        uchar buf[BSIZE];
+        rsect(dInode.addrs[dBlock], buf);
+        struct dirent* dir = (struct dirent*) buf;
+        for (int i = 0; i < BSIZE / sizeof(struct dirent); i++) {
+          //memmove(&dir, buf + i * sizeof(struct dirent), sizeof(struct dirent));
+          if (dir[i].inum == 0)
+            continue;
+          //printf("%d %s\n", dir.inum, dir.name);
+          if (strcmp(".", dir[i].name) == 0){
+            printf("I remove: %d\n", inode);
+            dir[i].inum = 0;
+            wsect(dInode.addrs[dBlock], buf);
+            return 0;
+          }
         }
       }
     }
