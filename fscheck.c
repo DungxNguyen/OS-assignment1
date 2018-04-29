@@ -91,6 +91,7 @@ int main(int argc, char *argv[]){
   rsect(1, buf);
   memmove(&sb, buf, sizeof(sb));
 
+
   printf("%d %d %d %d %x %x %x\n", sb.size, sb.nblocks, sb.ninodes, sb.nlog, sb.logstart, sb.inodestart, sb.bmapstart);
 
   nbitmap = sb.size / (BSIZE*8) + 1;
@@ -132,6 +133,7 @@ void checkInodeInDirectoryRecursive(struct dinode dir, int *inodeRealUse){
     rsect(dir.addrs[dBlock], buf);
     for (int i = 0; i < BSIZE / sizeof(struct dirent); i++) {
       memmove(&dirEntry, buf + i * sizeof(struct dirent), sizeof(struct dirent));
+      //printf("%d\n", dirEntry.inum);
       if (dirEntry.inum == 0 || !strcmp(dirEntry.name, ".") || !strcmp(dirEntry.name, ".."))
         continue;
       inodeRealUse[dirEntry.inum] += 1;
@@ -375,6 +377,7 @@ int checkDirFormat(){ //4
     struct dinode dInode;
     rinode(inode, &dInode);
     if (dInode.type == T_DIR) {
+      //printf("E4 %d\n", findDir(dInode.addrs[0], "."));
       for(int dBlock = 0; dBlock < NDIRECT; dBlock++) {
         // no map is okay
         if(dInode.addrs[dBlock] == 0)
@@ -573,9 +576,6 @@ int checkAddressInUsedOnce(){ //8
         exit(1);
       }else{
         inUsedBlock[dInode.addrs[dBlock] - nmeta] = 1;
-      }
-      if(dInode.addrs[dBlock] == 59){
-        printf("Got 59: %d\n", inode);
       }
     }
     
