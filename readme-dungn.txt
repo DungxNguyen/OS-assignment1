@@ -12,3 +12,12 @@ Project 4 README
 - testpri2 will test that priority processes will run in a round-robin scheduler while low priority ones have to wait
 - testpri3 will test that a high priority process degrades himself. In the 1st half, 2 high processes run parallely. In the 2nd half, 2 low processes run parrelly (1 of them is the higher one that has been degraded).
 
+
+------------------------------------------------------------------------
+my changes
+- creates 2 new system calls
+
+- proc.c: changed "scheduler" to
+  + If it is going to run a low priority process, check if there is any high proirity ones which are in "runnable" status
+    + If there is, skip the miserable one (low priority)
+- proc.h: add new fields to store priority, hticks, lticks
